@@ -1,7 +1,7 @@
 ---
-title: "Resources API Endpoints Reference Guide"
+title: "Resources API Reference — List, Create, Update & Delete"
 sidebarTitle: "Resources"
-description: "Create and manage resources in your Google workspace — list, retrieve, update, and delete resources via the Resources REST API."
+description: "Manage workspace assets in Google: list resources, retrieve items, create with metadata, update fields, and delete records via the Resources REST API."
 ---
 
 The Resources API gives you full control over the assets stored in your Google workspace. Resources represent any named object — documents, datasets, configurations, or custom types — that your team creates and shares. Use these endpoints to integrate resource management directly into your own tooling.
@@ -284,6 +284,6 @@ curl -X DELETE "https://api.google.com/v1/resources/res_01hy3m4n7r" \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
-```
+```http
 HTTP/1.1 204 No Content
 ```

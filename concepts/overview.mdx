@@ -1,5 +1,5 @@
 ---
-title: "Google Platform Architecture and Core Concepts"
+title: "Google Cloud Platform: Architecture and Core Concepts"
 sidebarTitle: "Overview"
 description: "Learn how Google's cloud platform is structured, how its services connect, and the key terminology you need to build and integrate effectively."
 ---
@@ -36,7 +36,7 @@ SDKs sit on top of the REST API and provide idiomatic wrappers for your language
 All API interactions follow a standard HTTP request/response cycle:
 
 1. Your client sends an HTTPS request with an `Authorization` header containing your API key.
-2. Google's API gateway authenticates the request and routes it to the appropriate service.
+2. The platform authenticates the request and routes it to the appropriate service.
 3. The service performs the operation and returns a JSON body with a `data` envelope and metadata.
 4. For mutating operations (POST, PATCH, DELETE), a corresponding event is recorded and — if you have a matching webhook — delivered to your endpoint.
 

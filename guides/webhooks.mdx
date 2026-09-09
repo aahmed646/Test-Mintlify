@@ -1,7 +1,7 @@
 ---
-title: "Receive Real-Time Events with Google Webhooks"
+title: "Google API Webhooks: Real-Time Event Notifications"
 sidebarTitle: "Webhooks"
-description: "Set up webhook endpoints, register them with Google's API, verify signatures, and handle retries to react to events in real time."
+description: "Learn to register webhook endpoints with Google's API, verify payload signatures, handle all five event types, and manage delivery retries."
 ---
 
 Webhooks let Google push event notifications directly to your server the moment something happens — no polling required. Instead of repeatedly asking "did anything change?", you register an endpoint and Google calls it automatically whenever a subscribed event fires. This guide shows you how to build, register, and secure a production-ready webhook integration.
@@ -67,6 +67,9 @@ app.post(
 
 function handleEvent(event) {
   switch (event.type) {
+    case "user.created":
+      console.log("New user:", event.data.id);
+      break;
     case "resource.created":
       console.log("New resource:", event.data.id);
       break;
@@ -75,6 +78,9 @@ function handleEvent(event) {
       break;
     case "resource.deleted":
       console.log("Deleted resource:", event.data.id);
+      break;
+    case "event.fired":
+      console.log("Custom event fired:", event.data.id);
       break;
     default:
       console.log("Unhandled event type:", event.type);

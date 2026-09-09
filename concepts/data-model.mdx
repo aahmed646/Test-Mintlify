@@ -1,10 +1,10 @@
 ---
-title: "Google Platform Data Model and Entity Reference"
+title: "Google Platform Data Model: Users, Resources, Events"
 sidebarTitle: "Data Model"
 description: "Understand the core entities in Google's data model — users, resources, and events — and how they relate to each other across the platform."
 ---
 
-Everything you do on the Google platform ultimately maps to three fundamental entities: **users**, **resources**, and **events**. Understanding what each entity represents, what fields it carries, and how the entities relate to one another will help you design integrations that are predictable, maintainable, and aligned with how the platform works internally.
+Everything you do on the Google platform ultimately maps to three fundamental entities: **users**, **resources**, and **events**. Understanding what each entity represents, what fields it carries, and how the entities relate to one another will help you design integrations that are predictable, maintainable, and aligned with how the platform works.
 
 ## Users
 
@@ -37,6 +37,27 @@ A user represents an individual account holder or team member with a verified id
 <ResponseField name="last_active_at" type="string (ISO 8601)">
   The timestamp of the user's most recent authenticated activity.
 </ResponseField>
+
+### Example User Object
+
+Here is a representative JSON payload for a user as returned by the API:
+
+```json
+{
+  "data": {
+    "id": "usr_01xyz",
+    "email": "alex@example.com",
+    "display_name": "Alex Johnson",
+    "role": "editor",
+    "teams": ["team_01abc", "team_02def"],
+    "created_at": "2024-01-10T09:00:00Z",
+    "last_active_at": "2024-03-20T15:45:00Z"
+  },
+  "meta": {
+    "request_id": "req_uu11vv22"
+  }
+}
+```
 
 ---
 
@@ -139,6 +160,35 @@ Events are immutable records created automatically whenever a resource changes s
 <ResponseField name="occurred_at" type="string (ISO 8601)">
   The precise timestamp at which the event occurred, recorded server-side.
 </ResponseField>
+
+### Example Event Object
+
+Here is a representative JSON payload for an event as returned by the API or delivered to a webhook endpoint:
+
+```json
+{
+  "data": {
+    "id": "evt_99zyx",
+    "type": "resource.updated",
+    "actor_id": "usr_01xyz",
+    "resource_id": "res_01abc",
+    "payload": {
+      "before": {
+        "name": "Q4 Report Draft",
+        "status": "active"
+      },
+      "after": {
+        "name": "Q4 Financial Report",
+        "status": "active"
+      }
+    },
+    "occurred_at": "2024-03-15T14:22:10Z"
+  },
+  "meta": {
+    "request_id": "req_ee55ff66"
+  }
+}
+```
 
 ---
 

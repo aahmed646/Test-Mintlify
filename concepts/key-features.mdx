@@ -1,7 +1,7 @@
 ---
-title: "Key Features of the Google Platform Explained"
+title: "Google Platform: Key Features and Core Capabilities"
 sidebarTitle: "Key Features"
-description: "Explore the core capabilities that make Google's platform powerful — from cloud-based access and a full REST API to webhooks, permissions, and integrations."
+description: "Explore the core capabilities that make Google platform powerful — cloud access, REST API, webhooks, user management, configuration, and integrations."
 ---
 
 Google's platform is built around a set of core features that give you everything you need to work productively from any device, automate workflows through code, and connect to the tools your team already uses. The features below represent the primary capabilities customers rely on every day.
@@ -29,7 +29,7 @@ Google's platform is built around a set of core features that give you everythin
   </Card>
 </CardGroup>
 
-## Cloud-Based Access From Any Device
+## How Cloud Access Works
 
 Your data lives in Google's globally distributed cloud infrastructure, replicated across regions for durability and low-latency access. You never need to worry about local storage limits or device-specific compatibility — every feature you have access to on a desktop is equally available on mobile.
 
@@ -42,11 +42,35 @@ Your data lives in Google's globally distributed cloud infrastructure, replicate
 The Google REST API follows standard conventions: resource URLs are predictable, HTTP methods map directly to operations, and every response includes a consistent JSON envelope. You can explore the full API reference interactively, and every endpoint supports OAuth 2.0 and API key authentication.
 
 ```bash
+# List all resources
+curl https://api.google.com/v1/resources \
+  -H "Authorization: Bearer YOUR_API_KEY"
+
 # Create a new resource
 curl -X POST https://api.google.com/v1/resources \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"name": "My Document", "type": "document"}'
+
+# List all users in your account
+curl https://api.google.com/v1/users \
+  -H "Authorization: Bearer YOUR_API_KEY"
+
+# Create a new user (invite a team member)
+curl -X POST https://api.google.com/v1/users \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"email": "teammate@example.com", "role": "editor"}'
+
+# List recent events
+curl https://api.google.com/v1/events \
+  -H "Authorization: Bearer YOUR_API_KEY"
+
+# Register a webhook
+curl -X POST https://api.google.com/v1/webhooks \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://your-app.example.com/webhooks", "events": ["resource.created", "resource.updated"]}'
 
 # Update a resource
 curl -X PATCH https://api.google.com/v1/resources/res_01abc \
