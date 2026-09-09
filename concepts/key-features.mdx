@@ -1,0 +1,100 @@
+---
+title: "Key Features of the Google Platform Explained"
+sidebarTitle: "Key Features"
+description: "Explore the core capabilities that make Google's platform powerful — from cloud-based access and a full REST API to webhooks, permissions, and integrations."
+---
+
+Google's platform is built around a set of core features that give you everything you need to work productively from any device, automate workflows through code, and connect to the tools your team already uses. The features below represent the primary capabilities customers rely on every day.
+
+## Cloud-Based Access From Any Device
+
+<CardGroup cols={2}>
+  <Card title="Anywhere Access" icon="globe">
+    Every Google service runs in the cloud, so your data and tools are always available — whether you're on a laptop, tablet, or phone. There's nothing to install, update, or maintain on your end; Google handles uptime, backups, and infrastructure automatically.
+  </Card>
+  <Card title="REST API" icon="code">
+    The REST API gives you full programmatic control over every resource in your account using standard HTTP verbs. You can create, read, update, and delete resources from any language or platform — if it can make an HTTPS request, it can talk to Google.
+  </Card>
+  <Card title="Real-Time Webhooks" icon="bolt">
+    Webhooks let you build event-driven workflows that react the moment something changes in your account. Register an endpoint, choose the events you care about, and Google will POST a signed payload to your server in real time — no polling required.
+  </Card>
+  <Card title="User & Permissions Management" icon="users">
+    Invite team members, assign granular roles, and control exactly who can read, write, or administer each resource. Permissions cascade through teams and projects, making it easy to enforce least-privilege access across large organizations.
+  </Card>
+  <Card title="Flexible Configuration" icon="sliders">
+    Customize the platform's behavior through settings, feature flags, and environment-specific configurations. You can tailor workflows, notification preferences, and integration behavior without writing custom code or waiting for a deployment.
+  </Card>
+  <Card title="Integration Ecosystem" icon="puzzle-piece">
+    Google connects natively with hundreds of third-party tools — productivity suites, CRMs, data warehouses, and communication platforms. Official integrations are maintained and versioned alongside the core platform, so they stay working as both sides evolve.
+  </Card>
+</CardGroup>
+
+## Cloud-Based Access From Any Device
+
+Your data lives in Google's globally distributed cloud infrastructure, replicated across regions for durability and low-latency access. You never need to worry about local storage limits or device-specific compatibility — every feature you have access to on a desktop is equally available on mobile.
+
+<Tip>
+  Enable offline mode in supported Google apps to keep working when you're temporarily without an internet connection. Changes sync automatically when you reconnect.
+</Tip>
+
+## REST API With Full CRUD Operations
+
+The Google REST API follows standard conventions: resource URLs are predictable, HTTP methods map directly to operations, and every response includes a consistent JSON envelope. You can explore the full API reference interactively, and every endpoint supports OAuth 2.0 and API key authentication.
+
+```bash
+# Create a new resource
+curl -X POST https://api.google.com/v1/resources \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "My Document", "type": "document"}'
+
+# Update a resource
+curl -X PATCH https://api.google.com/v1/resources/res_01abc \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "My Updated Document"}'
+
+# Delete a resource
+curl -X DELETE https://api.google.com/v1/resources/res_01abc \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+## Real-Time Webhooks for Event-Driven Workflows
+
+When you register a webhook, you specify an endpoint URL and a list of event types you want to receive. Google delivers each matching event as an HTTP POST within seconds of it occurring, with a cryptographic signature in the `X-Google-Signature` header so you can verify the payload hasn't been tampered with.
+
+```javascript
+// Verify a webhook signature (Node.js example)
+const crypto = require("crypto");
+
+function verifyWebhook(payload, signature, secret) {
+  const expected = crypto
+    .createHmac("sha256", secret)
+    .update(payload)
+    .digest("hex");
+  return crypto.timingSafeEqual(
+    Buffer.from(`sha256=${expected}`),
+    Buffer.from(signature)
+  );
+}
+```
+
+<Warning>
+  Always verify the webhook signature before processing the payload. Skipping this step leaves your endpoint vulnerable to spoofed requests from malicious actors.
+</Warning>
+
+## User and Permissions Management
+
+Roles in Google map to four permission tiers: **Viewer**, **Editor**, **Admin**, and **Owner**. You assign roles at the team or resource level, and more specific assignments take precedence over broader ones. Audit logs record every permission change so you have a complete history of who had access to what, and when.
+
+## Flexible Configuration and Customization
+
+Configuration lives at three levels — account, team, and resource — and lower levels can override higher ones. Use the Settings API to programmatically apply configurations across environments, ensuring your staging and production accounts stay in sync without manual intervention.
+
+## Comprehensive Integration Ecosystem
+
+Google's integration marketplace lists every available connector with its required permissions, supported event types, and setup instructions. Official integrations authenticate using OAuth 2.0, so you never need to share API keys with third-party services — they receive scoped tokens that you can revoke at any time.
+
+<Info>
+  If you need a custom integration not available in the marketplace, the REST API and webhook system give you everything you need to build one. The same primitives powering official integrations are fully available to you.
+</Info>

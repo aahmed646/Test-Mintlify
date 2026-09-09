@@ -1,0 +1,161 @@
+---
+title: "Google API Rate Limits and Backoff Strategies"
+sidebarTitle: "Rate Limits"
+description: "Understand Google API rate limits, read response headers to track usage, handle 429 errors gracefully, and request a higher limit for your account."
+---
+
+The Google API applies rate limits to every API key to ensure consistent performance across all customers. Understanding these limits — and building your integration to handle them gracefully — keeps your application reliable even during traffic spikes.
+
+## Default Limits
+
+Every API key starts with the following default limits:
+
+| Limit | Value |
+|---|---|
+| Requests per minute | **1,000** |
+| Requests per day | **10,000** |
+
+Limits are applied per API key. If you use multiple keys, each key has its own independent quota. Day limits reset at **00:00 UTC**.
+
+## Rate Limit Headers
+
+Every API response includes three headers so you can monitor your consumption in real time:
+
+```
+X-RateLimit-Limit: 1000
+X-RateLimit-Remaining: 834
+X-RateLimit-Reset: 1716825600
+```
+
+<ResponseField name="X-RateLimit-Limit" type="integer">
+  The maximum number of requests allowed in the current one-minute window for your API key.
+</ResponseField>
+
+<ResponseField name="X-RateLimit-Remaining" type="integer">
+  The number of requests remaining in the current one-minute window. When this reaches `0`, subsequent requests return a `429` error until the window resets.
+</ResponseField>
+
+<ResponseField name="X-RateLimit-Reset" type="integer">
+  A Unix timestamp (seconds) indicating when the current rate limit window resets and `X-RateLimit-Remaining` returns to its maximum value.
+</ResponseField>
+
+## Handling 429 Errors
+
+When you exceed your rate limit, the API returns a `429 Too Many Requests` response with a `Retry-After` header telling you how many seconds to wait:
+
+```http
+HTTP/1.1 429 Too Many Requests
+Retry-After: 14
+X-RateLimit-Limit: 1000
+X-RateLimit-Remaining: 0
+X-RateLimit-Reset: 1716825600
+
+{
+  "error": {
+    "code": "RATE_LIMIT_EXCEEDED",
+    "message": "You have exceeded the request limit for this window. Retry after 14 seconds.",
+    "details": {
+      "retry_after": 14,
+      "limit": 1000,
+      "window": "1m"
+    }
+  }
+}
+```
+
+Never retry a `429` immediately — wait at least the number of seconds specified in `Retry-After` before sending the next request.
+
+## Exponential Backoff
+
+For robust production integrations, implement exponential backoff with jitter. This strategy progressively increases the wait time between retries and adds randomness to prevent all clients from retrying simultaneously.
+
+```javascript
+/**
+ * Makes an API request with exponential backoff and jitter.
+ * Retries on 429 (rate limited) and 5xx (server error) responses.
+ */
+async function fetchWithBackoff(url, options = {}, maxRetries = 5) {
+  const BASE_DELAY_MS = 500;
+  const MAX_DELAY_MS = 30_000;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        "Authorization": `Bearer ${process.env.GOOGLE_API_KEY}`,
+        "Content-Type": "application/json",
+        ...options.headers,
+      },
+    });
+
+    // Success — return the parsed response immediately
+    if (response.ok) {
+      return response.json();
+    }
+
+    // Do not retry on client errors (4xx) except 429
+    const isRateLimited = response.status === 429;
+    const isServerError = response.status >= 500;
+
+    if (!isRateLimited && !isServerError) {
+      const error = await response.json();
+      throw new Error(`API error ${response.status}: ${error.error.message}`);
+    }
+
+    // On the last attempt, throw instead of waiting
+    if (attempt === maxRetries) {
+      throw new Error(`Max retries reached. Last status: ${response.status}`);
+    }
+
+    // Respect the Retry-After header if present, otherwise use backoff
+    const retryAfter = response.headers.get("Retry-After");
+    const retryAfterMs = retryAfter
+      ? parseInt(retryAfter, 10) * 1000
+      : Math.min(BASE_DELAY_MS * 2 ** attempt, MAX_DELAY_MS);
+
+    // Add jitter: wait between 50% and 100% of the calculated delay
+    const jitter = retryAfterMs * (0.5 + Math.random() * 0.5);
+    const delayMs = Math.round(jitter);
+
+    console.warn(
+      `Attempt ${attempt + 1} failed with ${response.status}. ` +
+      `Retrying in ${delayMs}ms...`
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+  }
+}
+
+// Usage
+const users = await fetchWithBackoff("https://api.google.com/v1/users");
+console.log(users.data);
+```
+
+<Note>
+  **Best practices for staying within limits:**
+  - Cache responses locally when the underlying data changes infrequently.
+  - Batch write operations where the API supports it instead of issuing one request per record.
+  - Use webhooks to receive real-time updates instead of polling list endpoints.
+  - Monitor `X-RateLimit-Remaining` proactively and slow down before you hit zero.
+</Note>
+
+## Requesting Higher Limits
+
+If your use case consistently requires more than the default limits, you can request an increase from the [Google Dashboard](https://dashboard.google.com/settings/limits).
+
+To make a strong case for a limit increase, include the following information in your request:
+
+<Steps>
+  <Step title="Describe your use case">
+    Explain what your integration does and why you need more capacity. Include the name of the integration and the expected user impact.
+  </Step>
+  <Step title="Provide traffic estimates">
+    Share your expected requests per minute and requests per day, along with any known peak periods (e.g., end-of-month batch processing).
+  </Step>
+  <Step title="Confirm backoff is implemented">
+    Confirm that your integration handles `429` responses with exponential backoff. This is required for all elevated-limit accounts.
+  </Step>
+  <Step title="Submit and wait for approval">
+    The Google team reviews limit increase requests within 2 business days. You will receive an email confirmation when the new limit is applied to your API key.
+  </Step>
+</Steps>

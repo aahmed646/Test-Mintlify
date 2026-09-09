@@ -1,0 +1,126 @@
+---
+title: "Google REST API Overview and Getting Started"
+sidebarTitle: "Overview"
+description: "Learn how the Google REST API works — base URL, authentication, versioning, pagination, and error handling — so you can integrate quickly."
+---
+
+The Google REST API gives you programmatic access to the full suite of Google cloud services. Every feature available in the dashboard is also available through the API, making it straightforward to automate workflows, build integrations, and manage resources at scale.
+
+## Base URL
+
+All API requests are made to the following base URL:
+
+```
+https://api.google.com/v1
+```
+
+Every endpoint path is appended directly to this base URL. For example, to list users you would call `https://api.google.com/v1/users`.
+
+## Request and Response Format
+
+The Google API exclusively uses JSON for both request bodies and responses. Set the `Content-Type` and `Accept` headers on every request.
+
+```bash
+curl https://api.google.com/v1/users \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json"
+```
+
+A successful response looks like this:
+
+```json
+{
+  "data": [
+    {
+      "id": "usr_01HXZ9K2P3QRST4UVWXY",
+      "email": "jane@example.com",
+      "name": "Jane Smith",
+      "created_at": "2024-03-15T10:30:00Z"
+    }
+  ],
+  "next_cursor": "cursor_eyJpZCI6InVzcl8wMSJ9",
+  "has_more": true
+}
+```
+
+## Authentication
+
+Authenticate every request by passing your API key or OAuth 2.0 access token as a Bearer token in the `Authorization` header:
+
+```
+Authorization: Bearer YOUR_API_KEY
+```
+
+<Note>
+  Never include credentials in the URL query string. Always use the `Authorization` header to keep your keys secure. See the [Authentication guide](/api/authentication) for full details on API keys and OAuth 2.0.
+</Note>
+
+## Versioning
+
+The current stable API version is **v1**, which is reflected in the base URL. When Google releases a new major version, the previous version remains available for a deprecation window so you have time to migrate.
+
+To pin your integration to a specific version, include the `API-Version` header on your requests:
+
+```bash
+curl https://api.google.com/v1/users \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "API-Version: 2024-01-01"
+```
+
+Google announces version changes and deprecation timelines in the changelog. If you omit the `API-Version` header, requests are routed to the latest stable release of v1.
+
+## Pagination
+
+List endpoints return results in pages. Every paginated response includes the following fields:
+
+| Field | Type | Description |
+|---|---|---|
+| `data` | array | The current page of results |
+| `next_cursor` | string | Opaque cursor pointing to the next page |
+| `has_more` | boolean | `true` when additional pages exist |
+
+To fetch the next page, pass the value of `next_cursor` as the `cursor` query parameter:
+
+```bash
+curl "https://api.google.com/v1/users?cursor=cursor_eyJpZCI6InVzcl8wMSJ9&limit=20" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+When `has_more` is `false`, you have retrieved all available records. You can also control page size with the optional `limit` parameter (default `20`, maximum `100`).
+
+## Error Format
+
+When a request fails, the API returns a structured error object so your code can handle failures programmatically:
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "The 'email' field is required.",
+    "details": {
+      "field": "email",
+      "constraint": "required"
+    }
+  }
+}
+```
+
+The HTTP status code reflects the class of error (e.g., `400` for bad requests, `401` for authentication failures, `429` for rate limit errors, `500` for server errors). Always check both the status code and the `error.code` string when handling errors.
+
+## Explore the API
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="lock" href="/api/authentication">
+    Set up API keys and OAuth 2.0 tokens to secure your requests.
+  </Card>
+  <Card title="Rate Limits" icon="gauge-high" href="/api/rate-limits">
+    Understand request limits and how to implement backoff strategies.
+  </Card>
+  <Card title="Users API" icon="user" href="/api/endpoints/users">
+    Create, read, update, and delete user accounts programmatically.
+  </Card>
+  <Card title="Resources API" icon="database" href="/api/endpoints/resources">
+    Upload, retrieve, and manage files and objects in Google Storage.
+  </Card>
+</CardGroup>

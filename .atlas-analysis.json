@@ -1,20 +1,11 @@
 {
-  "$schema": "https://mintlify.com/docs.json",
-  "name": "Google",
+  "projectType": "saas",
+  "projectName": "Google",
+  "projectDescription": "A suite of cloud-based products and services for individuals and businesses.",
   "theme": "luma",
-  "colors": {
-    "primary": "#ef7025",
-    "light": "#eec9bc",
-    "dark": "#4fa1ab"
-  },
-  "favicon": "/favicon.svg",
-  "navbar": {
-    "primary": {
-      "type": "button",
-      "label": "Get Started",
-      "href": "/quickstart"
-    }
-  },
+  "primaryColor": "#ef7025",
+  "lightColor": "#eec9bc",
+  "darkColor": "#4fa1ab",
   "navigation": {
     "tabs": [
       {
@@ -76,5 +67,21 @@
         ]
       }
     ]
-  }
+  },
+  "keyFeatures": [
+    "Cloud-based services accessible from any device",
+    "User account management and authentication",
+    "REST API for programmatic access",
+    "Webhook support for real-time event notifications",
+    "Flexible configuration and customization options",
+    "Comprehensive integration support"
+  ],
+  "publicApiSurface": [
+    "GET /users",
+    "POST /users",
+    "GET /resources",
+    "POST /resources",
+    "GET /events",
+    "POST /webhooks"
+  ]
 }

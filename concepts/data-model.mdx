@@ -1,0 +1,171 @@
+---
+title: "Google Platform Data Model and Entity Reference"
+sidebarTitle: "Data Model"
+description: "Understand the core entities in Google's data model — users, resources, and events — and how they relate to each other across the platform."
+---
+
+Everything you do on the Google platform ultimately maps to three fundamental entities: **users**, **resources**, and **events**. Understanding what each entity represents, what fields it carries, and how the entities relate to one another will help you design integrations that are predictable, maintainable, and aligned with how the platform works internally.
+
+## Users
+
+A user represents an individual account holder or team member with a verified identity on the platform. Users are the root of the permission hierarchy — every API key, every resource, and every event trace back to a user or a team of users.
+
+<ResponseField name="id" type="string" required>
+  A globally unique, immutable identifier for the user, prefixed with `usr_`. Example: `usr_01abc`.
+</ResponseField>
+
+<ResponseField name="email" type="string" required>
+  The primary email address associated with the account. Used for login, notifications, and identity verification.
+</ResponseField>
+
+<ResponseField name="display_name" type="string">
+  The user's human-readable name as shown in the UI and API responses. Can be updated at any time.
+</ResponseField>
+
+<ResponseField name="role" type="string" required>
+  The user's platform-level role. One of `owner`, `admin`, `editor`, or `viewer`. Controls access across the account.
+</ResponseField>
+
+<ResponseField name="teams" type="array">
+  An array of team IDs the user belongs to. A user can be a member of multiple teams, each with its own role assignment.
+</ResponseField>
+
+<ResponseField name="created_at" type="string (ISO 8601)">
+  The timestamp at which the user account was created.
+</ResponseField>
+
+<ResponseField name="last_active_at" type="string (ISO 8601)">
+  The timestamp of the user's most recent authenticated activity.
+</ResponseField>
+
+---
+
+## Resources
+
+Resources are the primary objects you create and manage through the Google API. Think of a resource as any persistent item that belongs to your account — a document, a project, a configuration record, or a data asset. Every resource shares a common set of base fields, and each resource `type` may add additional type-specific fields on top.
+
+<ResponseField name="id" type="string" required>
+  A globally unique, immutable identifier prefixed with `res_`. Example: `res_01abc`.
+</ResponseField>
+
+<ResponseField name="type" type="string" required>
+  The category of resource. Determines which additional fields are present. Example values: `document`, `project`, `configuration`.
+</ResponseField>
+
+<ResponseField name="name" type="string" required>
+  A human-readable label for the resource. Mutable — you can update it via a PATCH request at any time.
+</ResponseField>
+
+<ResponseField name="owner_id" type="string" required>
+  The `id` of the user or team that owns this resource and has full administrative rights over it.
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  The current lifecycle state of the resource. One of `active`, `archived`, or `deleted`. Deleted resources are soft-deleted and retained for 30 days.
+</ResponseField>
+
+<ResponseField name="metadata" type="object">
+  A free-form key/value map (string keys, string values) for attaching your own labels or identifiers. Useful for storing external IDs or environment tags.
+</ResponseField>
+
+<ResponseField name="version" type="integer">
+  A monotonically increasing counter incremented on every mutation. Use this for optimistic concurrency control.
+</ResponseField>
+
+<ResponseField name="created_at" type="string (ISO 8601)">
+  The timestamp at which the resource was created.
+</ResponseField>
+
+<ResponseField name="updated_at" type="string (ISO 8601)">
+  The timestamp of the most recent mutation to the resource.
+</ResponseField>
+
+### Example Resource Object
+
+Here is a representative JSON payload for a resource as returned by the API:
+
+```json
+{
+  "data": {
+    "id": "res_01abc",
+    "type": "document",
+    "name": "Q4 Financial Report",
+    "owner_id": "usr_01xyz",
+    "status": "active",
+    "metadata": {
+      "department": "finance",
+      "external_ref": "DOC-2024-0042"
+    },
+    "version": 7,
+    "created_at": "2024-03-01T08:00:00Z",
+    "updated_at": "2024-03-15T14:22:10Z"
+  },
+  "meta": {
+    "request_id": "req_ab12cd34"
+  }
+}
+```
+
+<Note>
+  The `version` field is particularly useful when multiple clients might update the same resource concurrently. Include the current version in your PATCH request body; Google will reject the update with a `409 Conflict` if the resource has been modified since you last fetched it.
+</Note>
+
+---
+
+## Events
+
+Events are immutable records created automatically whenever a resource changes state or a significant platform action occurs. They serve two purposes: they form a complete, auditable history of everything that has happened in your account, and they are the payloads delivered to your webhook endpoints.
+
+<ResponseField name="id" type="string" required>
+  A globally unique, immutable identifier prefixed with `evt_`. Example: `evt_99zyx`.
+</ResponseField>
+
+<ResponseField name="type" type="string" required>
+  A dot-separated string describing what happened. Follows the pattern `{entity}.{action}`. Examples: `resource.created`, `resource.updated`, `resource.deleted`, `user.invited`.
+</ResponseField>
+
+<ResponseField name="actor_id" type="string" required>
+  The `id` of the user or API key that triggered the event.
+</ResponseField>
+
+<ResponseField name="resource_id" type="string">
+  The `id` of the resource affected by this event, if applicable. May be `null` for account-level events.
+</ResponseField>
+
+<ResponseField name="payload" type="object">
+  A snapshot of the affected entity at the time the event was recorded. For update events, includes both `before` and `after` sub-objects so you can diff exactly what changed.
+</ResponseField>
+
+<ResponseField name="occurred_at" type="string (ISO 8601)">
+  The precise timestamp at which the event occurred, recorded server-side.
+</ResponseField>
+
+---
+
+## Entity Relationships
+
+The three core entities are related as follows:
+
+| Relationship | Description |
+|---|---|
+| User → Resources | A user can own zero or more resources. Ownership grants full administrative rights including delete and permission management. |
+| User → Events | Every event has an `actor_id` pointing to the user or service account that triggered it. You can filter the event log by actor to audit a specific user's activity. |
+| Resource → Events | Each resource accumulates a chronological event log over its lifetime. Fetch `GET /v1/resources/{id}/events` to retrieve the full history for a single resource. |
+| Events → Webhooks | When an event is created, Google evaluates all registered webhooks. Any webhook subscribed to the matching `type` receives a POST delivery containing the event payload. |
+
+<Tip>
+  Use the `resource_id` field on events as a foreign key when building integrations. By joining events to resources you can reconstruct the full state history of any object in your account without storing a separate snapshot.
+</Tip>
+
+---
+
+## Putting It All Together
+
+When you make an API call that mutates a resource — say, renaming a document — the platform executes the following sequence:
+
+1. Validates your API key and confirms the acting user has `editor` or higher permissions on the resource.
+2. Applies the mutation and increments the resource's `version` counter.
+3. Creates an immutable `resource.updated` event with `before` and `after` payloads.
+4. Fans out the event to all matching webhook subscriptions asynchronously.
+
+This sequence ensures that your audit trail is always consistent with the current state of your resources, and that downstream systems relying on webhooks receive accurate, tamper-evident notifications.

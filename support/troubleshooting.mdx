@@ -1,0 +1,390 @@
+---
+title: "Troubleshooting Common Google API Errors"
+sidebarTitle: "Troubleshooting"
+description: "Diagnose and fix the most common Google API errors — from authentication failures and rate limits to webhook delivery issues and OAuth problems."
+---
+
+When something goes wrong with a Google API integration, the response body and HTTP status code together almost always tell you exactly what to fix. This guide walks you through the most common errors, their likely causes, and the steps to resolve them.
+
+<Note>
+Check the [Google Status Page](https://status.google.com) before spending time debugging — if there's an active incident, the issue may resolve on its own. For issues that need hands-on help, contact [support@google.com](mailto:support@google.com) with the `X-Request-ID` from your failing response.
+</Note>
+
+---
+
+## Authentication & Authorization Errors
+
+<Accordion title="401 Unauthorized — API key missing, invalid, or expired">
+
+**Example error response**
+
+```json
+{
+  "error": {
+    "code": 401,
+    "status": "UNAUTHENTICATED",
+    "message": "API key not valid. Please pass a valid API key.",
+    "details": [
+      {
+        "reason": "API_KEY_INVALID",
+        "domain": "googleapis.com"
+      }
+    ]
+  }
+}
+```
+
+**Likely causes**
+
+- The `Authorization` header is missing from the request entirely.
+- The API key was copied incorrectly (extra whitespace, missing characters).
+- The key was revoked or regenerated and the old value is still in use.
+- The key belongs to a different environment (e.g., a sandbox `test_` key used against a production-only endpoint).
+
+**How to fix**
+
+1. Confirm the header is present and formatted correctly:
+
+```bash
+curl -H "Authorization: Bearer YOUR_API_KEY" \
+  https://api.google.com/v1/resources
+```
+
+2. Open **Settings → API Keys** in the Developer Console and verify the key is listed as **Active**.
+3. If the key has been regenerated, update it in every place it's used — environment variables, secrets managers, and CI/CD pipelines.
+4. If you recently rotated the key, allow up to 60 seconds for the change to propagate globally.
+
+<Tip>
+Store your API key in an environment variable (`GOOGLE_API_KEY`) rather than hard-coding it. This makes rotation as simple as updating the variable without touching your code.
+</Tip>
+</Accordion>
+
+<Accordion title="403 Forbidden — insufficient permissions">
+
+**Example error response**
+
+```json
+{
+  "error": {
+    "code": 403,
+    "status": "PERMISSION_DENIED",
+    "message": "The caller does not have permission to execute the specified operation.",
+    "details": [
+      {
+        "reason": "ACCESS_TOKEN_SCOPE_INSUFFICIENT",
+        "domain": "googleapis.com"
+      }
+    ]
+  }
+}
+```
+
+**Likely causes**
+
+- The API key or OAuth token doesn't have the required scope for the operation you're attempting.
+- Your account plan doesn't include access to the API or endpoint you're calling.
+- The resource belongs to a different project or organization and cross-access isn't enabled.
+- A team member's role restricts them from performing the action.
+
+**How to fix**
+
+1. Check the required scopes in the [API Reference](https://developers.google.com/reference) for the endpoint you're calling.
+2. If you're using OAuth, re-authorize with the correct scopes (see the [OAuth token not working](#) section below).
+3. Confirm your plan includes access to the feature under **Settings → Billing → Plan Features**.
+4. If acting as a team member, ask an Owner or Admin to update your role under **Settings → Team Members**.
+
+```bash
+# Inspect an OAuth token's granted scopes
+curl -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  https://api.google.com/v1/token/info
+```
+
+</Accordion>
+
+---
+
+## Resource Errors
+
+<Accordion title="404 Not Found — resource doesn't exist or wrong endpoint URL">
+
+**Example error response**
+
+```json
+{
+  "error": {
+    "code": 404,
+    "status": "NOT_FOUND",
+    "message": "Requested resource 'projects/my-project/resources/nonexistent-id' was not found.",
+    "details": []
+  }
+}
+```
+
+**Likely causes**
+
+- The resource ID in the URL path was deleted, never created, or belongs to a different project.
+- The endpoint URL has a typo — check the API version segment (e.g., `/v1/` vs `/v2/`).
+- You're querying a sandbox resource ID against the production endpoint (or vice versa).
+- A trailing slash is missing or unexpectedly present.
+
+**How to fix**
+
+1. Double-check the URL against the [API Reference](https://developers.google.com/reference):
+
+```bash
+# Correct format
+GET https://api.google.com/v1/projects/{projectId}/resources/{resourceId}
+
+# Common mistakes
+GET https://api.google.com/resources/{resourceId}        # missing project path
+GET https://api.google.com/v2/projects/{projectId}/...  # wrong API version
+```
+
+2. Verify the resource exists in the Developer Console under the appropriate section.
+3. Confirm you're using a key that belongs to the same project as the resource.
+4. If you recently deleted the resource by mistake, check **Logs → Audit Trail** for deletion events — some resource types support restore within 30 days.
+
+</Accordion>
+
+---
+
+## Rate Limiting
+
+<Accordion title="429 Too Many Requests — rate limit exceeded">
+
+**Example error response**
+
+```json
+{
+  "error": {
+    "code": 429,
+    "status": "RESOURCE_EXHAUSTED",
+    "message": "Quota exceeded for quota metric 'requests' and limit 'per-minute-limit'.",
+    "details": [
+      {
+        "reason": "RATE_LIMIT_EXCEEDED",
+        "domain": "googleapis.com",
+        "metadata": {
+          "quota_limit": "per-minute-limit",
+          "quota_metric": "googleapis.com/requests"
+        }
+      }
+    ]
+  }
+}
+```
+
+**Likely causes**
+
+- Your integration sends bursts of requests that exceed the per-minute quota for your plan.
+- Multiple services share the same API key, exhausting its quota faster than expected.
+- A retry loop without backoff is flooding the API after an initial error.
+
+**How to fix**
+
+Implement exponential backoff with jitter so retries don't all fire at the same time:
+
+```javascript
+async function requestWithBackoff(fn, maxRetries = 5) {
+  let attempt = 0;
+  while (attempt < maxRetries) {
+    try {
+      return await fn();
+    } catch (err) {
+      if (err.status !== 429 || attempt === maxRetries - 1) throw err;
+      const delay = Math.min(1000 * 2 ** attempt + Math.random() * 500, 32000);
+      console.log(`Rate limited. Retrying in ${Math.round(delay)}ms…`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      attempt++;
+    }
+  }
+}
+```
+
+Respect the `Retry-After` header when it's present — it gives the exact number of seconds to wait:
+
+```javascript
+const retryAfter = parseInt(response.headers.get("Retry-After") || "1", 10);
+await new Promise(resolve => setTimeout(resolve, retryAfter * 1000));
+```
+
+If you regularly hit rate limits, consider upgrading your plan under **Settings → Billing** or contact [sales@google.com](mailto:sales@google.com) for a custom quota increase.
+
+</Accordion>
+
+---
+
+## Server Errors
+
+<Accordion title="500 Internal Server Error — unexpected server-side failure">
+
+**Example error response**
+
+```json
+{
+  "error": {
+    "code": 500,
+    "status": "INTERNAL",
+    "message": "An internal error occurred. Please retry the request.",
+    "requestId": "abc123xyz"
+  }
+}
+```
+
+**Likely causes**
+
+- A transient fault on Google's infrastructure (most common cause).
+- A malformed request body that triggers an unhandled server-side exception.
+- An active incident affecting the API you're calling.
+
+**How to fix**
+
+1. **Check the status page first** — visit [status.google.com](https://status.google.com) to see if there's an active incident. If there is, wait for it to be resolved; retrying won't help.
+2. **Retry with backoff** — transient 500 errors usually resolve within seconds. Use the same exponential backoff strategy shown in the 429 section above.
+3. **Validate your request body** — ensure the payload conforms exactly to the schema in the [API Reference](https://developers.google.com/reference). A missing required field or incorrect type can sometimes trigger a 500 instead of a 400.
+4. **Capture the request ID** — every 500 response includes an `X-Request-ID` response header (and often in the body as `requestId`). Include it when contacting support so our team can pull the server-side trace:
+
+```bash
+curl -i -H "Authorization: Bearer YOUR_API_KEY" \
+  https://api.google.com/v1/resources
+# Look for:  X-Request-ID: abc123xyz  in the response headers
+```
+
+<Warning>
+If you see sustained 500 errors across multiple endpoints and the status page shows no incident, contact [support@google.com](mailto:support@google.com) immediately with the `X-Request-ID` values and a description of your request pattern.
+</Warning>
+</Accordion>
+
+---
+
+## Webhooks
+
+<Accordion title="Webhook not receiving events — common causes checklist">
+
+If your webhook endpoint isn't receiving events, work through this checklist in order.
+
+**1. Confirm the endpoint is registered and enabled**
+
+Go to **Dashboard → Webhooks** and verify:
+- Your endpoint URL is listed.
+- The toggle shows **Enabled**.
+- The events you expect are checked under **Event Subscriptions**.
+
+**2. Verify the endpoint is publicly reachable**
+
+Google's servers must be able to reach your endpoint over the public internet. `localhost` and private network addresses will never work in production.
+
+```bash
+# Test reachability from outside your network
+curl -X POST https://your-domain.com/webhooks/google \
+  -H "Content-Type: application/json" \
+  -d '{"test": true}'
+```
+
+**3. Check that your endpoint returns HTTP 2xx within 10 seconds**
+
+If your handler takes longer than 10 seconds to respond, Google treats the delivery as failed and schedules a retry. Move any slow processing to a background queue and respond immediately:
+
+```javascript
+app.post("/webhooks/google", (req, res) => {
+  res.sendStatus(200);          // acknowledge immediately
+  processEventAsync(req.body);  // handle in the background
+});
+```
+
+**4. Inspect delivery logs**
+
+Go to **Dashboard → Webhooks → Delivery Logs** to see every delivery attempt, the HTTP status your endpoint returned, and the full request/response. You can replay any failed event from this screen.
+
+**5. Validate your TLS certificate**
+
+Google only delivers to endpoints with a valid, publicly trusted TLS certificate. Self-signed certificates are rejected. Run a quick check:
+
+```bash
+curl -vI https://your-domain.com/webhooks/google 2>&1 | grep -E "SSL|TLS|certificate"
+```
+
+**6. Check for IP allowlisting**
+
+If your server has a firewall or IP allowlist, add Google's webhook sender IPs. The current list is published at [developers.google.com/webhooks/ips](https://developers.google.com/webhooks/ips).
+
+<Note>
+If you've worked through the checklist and still aren't receiving events, email [support@google.com](mailto:support@google.com) with your webhook endpoint URL and the `X-Request-ID` values from the delivery logs.
+</Note>
+</Accordion>
+
+---
+
+## OAuth
+
+<Accordion title="OAuth token not working — how to re-authorize">
+
+**Example error response**
+
+```json
+{
+  "error": {
+    "code": 401,
+    "status": "UNAUTHENTICATED",
+    "message": "OAuth2 access token expired or revoked.",
+    "details": [
+      {
+        "reason": "ACCESS_TOKEN_EXPIRED"
+      }
+    ]
+  }
+}
+```
+
+**Likely causes**
+
+- The access token has expired (Google access tokens expire after 1 hour by default).
+- The refresh token was revoked — this happens if the user revokes access, your app is re-authorized, or there's been a security event.
+- The scopes granted when the token was issued no longer match what the API call requires.
+
+**How to fix**
+
+**Refresh an expired access token** — if you have a valid refresh token, exchange it for a new access token without re-prompting the user:
+
+```bash
+curl -X POST https://oauth2.googleapis.com/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=refresh_token" \
+  -d "refresh_token=YOUR_REFRESH_TOKEN" \
+  -d "client_id=YOUR_CLIENT_ID" \
+  -d "client_secret=YOUR_CLIENT_SECRET"
+```
+
+```json
+{
+  "access_token": "ya29.new_access_token",
+  "expires_in": 3600,
+  "token_type": "Bearer"
+}
+```
+
+**Re-authorize the user** — if the refresh token is also invalid (you'll get `invalid_grant`), you need to restart the OAuth flow:
+
+```
+https://accounts.google.com/o/oauth2/v2/auth
+  ?client_id=YOUR_CLIENT_ID
+  &redirect_uri=YOUR_REDIRECT_URI
+  &response_type=code
+  &scope=https://www.googleapis.com/auth/YOUR_SCOPE
+  &access_type=offline
+  &prompt=consent
+```
+
+<Tip>
+Always request `access_type=offline` and `prompt=consent` the first time a user authorizes your app. This guarantees you receive a refresh token that lets you silently renew access without interrupting the user.
+</Tip>
+
+**Check granted scopes** — call the token info endpoint to see exactly what scopes the current token covers:
+
+```bash
+curl "https://oauth2.googleapis.com/tokeninfo?access_token=YOUR_ACCESS_TOKEN"
+```
+
+If the required scope is missing, re-run the authorization flow with the correct `scope` parameter. Users will be prompted to grant the additional permission.
+
+</Accordion>

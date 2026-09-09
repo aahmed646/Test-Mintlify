@@ -1,0 +1,115 @@
+---
+title: "Authenticating Requests to the Google API"
+sidebarTitle: "Authentication"
+description: "Learn how to authenticate Google API requests using API keys or OAuth 2.0 tokens, understand scopes, and handle authentication errors correctly."
+---
+
+Every request to the Google API must be authenticated. Google supports two authentication methods: **API keys** for server-to-server integrations and **OAuth 2.0 access tokens** for user-delegated access. Both methods use the same `Authorization` header format, so you can switch between them without changing your request structure.
+
+## API Keys
+
+API keys are the simplest way to authenticate. Generate a key from the [Google Dashboard](https://dashboard.google.com/settings/api-keys) and include it on every request.
+
+<Warning>
+  Never expose your API key in client-side code, public repositories, or URLs. Anyone with your key can make requests on your behalf. If a key is compromised, revoke it immediately from the dashboard and issue a new one.
+</Warning>
+
+Pass your API key as a Bearer token in the `Authorization` header:
+
+```bash
+curl https://api.google.com/v1/users \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json"
+```
+
+<ParamField header="Authorization" type="string" required>
+  Your API key or OAuth 2.0 access token, prefixed with `Bearer `. For example: `Bearer ggl_sk_live_abc123...`
+</ParamField>
+
+## OAuth 2.0
+
+Use OAuth 2.0 when your integration acts on behalf of a specific Google user. After completing the OAuth flow, you receive a short-lived access token. Pass it in exactly the same header format as an API key:
+
+```bash
+curl https://api.google.com/v1/profile \
+  -H "Authorization: Bearer USER_ACCESS_TOKEN" \
+  -H "Content-Type: application/json"
+```
+
+Access tokens expire after **60 minutes**. Use the refresh token returned during the OAuth flow to obtain a new access token without requiring the user to re-authenticate:
+
+```bash
+curl https://api.google.com/v1/oauth/token \
+  -X POST \
+  -H "Content-Type: application/json" \
+  -d '{
+    "grant_type": "refresh_token",
+    "refresh_token": "YOUR_REFRESH_TOKEN",
+    "client_id": "YOUR_CLIENT_ID",
+    "client_secret": "YOUR_CLIENT_SECRET"
+  }'
+```
+
+## Scopes
+
+Scopes control what actions an API key or OAuth token is permitted to perform. Assign the least permissive scope your integration needs.
+
+<Tabs>
+  <Tab title="read">
+    Grants read-only access to all resources. Use this scope for dashboards, reporting tools, and any integration that only needs to fetch data.
+
+    **Permitted actions:** `GET` requests on all endpoints.
+
+    **Example resources:** List users, retrieve storage objects, read analytics data.
+  </Tab>
+  <Tab title="write">
+    Grants read and write access. Use this scope for integrations that create or update resources but do not need to manage account-level settings.
+
+    **Permitted actions:** `GET`, `POST`, `PUT`, and `PATCH` requests. Does not include `DELETE` or administrative endpoints.
+
+    **Example resources:** Create users, upload files, update records.
+  </Tab>
+  <Tab title="admin">
+    Grants full access including destructive and account-level operations. Restrict this scope to trusted server-side applications only.
+
+    **Permitted actions:** All HTTP methods on all endpoints, including `DELETE` and account management.
+
+    **Example resources:** Delete users, manage billing, configure SSO, rotate API keys.
+  </Tab>
+</Tabs>
+
+To assign scopes to an API key, open the [API Keys page](https://dashboard.google.com/settings/api-keys) in your dashboard and select the key you want to configure.
+
+## Authentication Errors
+
+When a request is missing credentials or provides invalid ones, the API returns a `401 Unauthorized` response:
+
+```json
+{
+  "error": {
+    "code": "UNAUTHORIZED",
+    "message": "The provided API key is invalid or has been revoked.",
+    "details": {
+      "reason": "invalid_key"
+    }
+  }
+}
+```
+
+Common causes and fixes:
+
+<Accordion title="401 — Missing Authorization header">
+  You did not include the `Authorization` header. Add `-H "Authorization: Bearer YOUR_API_KEY"` to your request.
+</Accordion>
+
+<Accordion title="401 — Invalid or revoked key">
+  The key does not exist or was revoked. Verify the key is copied correctly from the dashboard and has not been deleted or rotated.
+</Accordion>
+
+<Accordion title="403 — Insufficient scope">
+  Your key exists and is valid, but it does not have the scope required for this action. Upgrade the key's scope in the dashboard or use a key with `write` or `admin` access.
+</Accordion>
+
+<Tip>
+  Use separate API keys for each environment (development, staging, production). This makes it easy to rotate keys independently and limits the blast radius if a key is ever exposed.
+</Tip>

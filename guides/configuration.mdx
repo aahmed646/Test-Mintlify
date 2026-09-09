@@ -1,0 +1,203 @@
+---
+title: "Configure Your Google Integration Settings"
+sidebarTitle: "Configuration"
+description: "Learn how to manage API keys, set allowed origins, configure notifications, connect third-party apps, and tailor settings per environment."
+---
+
+Getting your Google integration configured correctly from the start saves time as your project grows. This guide walks you through every major configuration area — from account-level settings in the Dashboard to environment-specific JSON payloads you can version-control alongside your code.
+
+## Access the Dashboard Settings
+
+All account and API configuration lives in the Google Dashboard. Sign in at [dashboard.google.com](https://dashboard.google.com) and navigate to **Settings** in the left sidebar. The settings panel is organized into four tabs: **General**, **API**, **Notifications**, and **Integrations**.
+
+<Note>
+You must have the **Owner** or **Admin** role on your account to change API settings or manage integrations. Viewers can read settings but cannot save changes.
+</Note>
+
+## Account-Level Settings
+
+<Steps>
+
+### Update your account profile
+
+Under **Settings → General**, set your account display name, time zone, and default language. These values appear in Dashboard reports and email notifications.
+
+### Set your billing contact
+
+Enter a billing email address that receives invoices and payment alerts. This address does not need to be the same as your login email.
+
+### Enable two-factor authentication
+
+Under **Settings → General → Security**, turn on two-factor authentication (2FA) for every team member with Dashboard access. Google supports authenticator apps (TOTP) and hardware security keys.
+
+<Warning>
+Accounts without 2FA enabled cannot create or rotate API keys after January 1, 2025. Enable 2FA before that date to avoid interruption.
+</Warning>
+
+</Steps>
+
+## API Settings
+
+<Steps>
+
+### Manage API keys
+
+Under **Settings → API → Keys**, you can create, rename, and revoke API keys. Each key displays its last-used timestamp so you can identify unused keys and safely remove them.
+
+<Note>
+Give each key a descriptive name that reflects where it's used — for example, `production-backend` or `ci-pipeline`. This makes auditing and rotation straightforward.
+</Note>
+
+### Configure allowed origins
+
+If you route API calls through a browser (using a backend proxy), add your domain to the **Allowed Origins** list under **Settings → API → CORS**. Only requests from listed origins are accepted.
+
+```
+https://app.yourcompany.com
+https://staging.yourcompany.com
+```
+
+Wildcard subdomains are not supported. Each origin must be listed explicitly.
+
+### Select a rate limit tier
+
+Under **Settings → API → Rate Limits**, choose the tier that matches your expected traffic:
+
+| Tier | Requests / minute | Burst limit |
+|---|---|---|
+| Free | 60 | 100 |
+| Growth | 1,000 | 2,500 |
+| Business | 10,000 | 25,000 |
+| Enterprise | Custom | Custom |
+
+<Note>
+If your integration hits rate limits consistently, upgrade your tier before adding retry logic — retries without a higher quota only increase your error rate.
+</Note>
+
+</Steps>
+
+## Notification Preferences
+
+<Steps>
+
+### Choose your notification channels
+
+Under **Settings → Notifications**, enable the channels you want to receive alerts on: **Email**, **Slack**, or **Webhook**.
+
+### Select event categories
+
+Check the categories relevant to your team:
+
+- **Billing** — invoices, payment failures, usage thresholds
+- **API** — key expiry warnings, unusual traffic spikes
+- **Security** — new logins, failed authentication attempts
+- **System** — scheduled maintenance, service incidents
+
+### Set notification frequency
+
+Choose between **Immediate** (one alert per event), **Hourly digest**, or **Daily digest** for each category. High-severity security alerts are always sent immediately regardless of this setting.
+
+</Steps>
+
+## Integration Settings
+
+Connect third-party services to automate workflows between Google and the tools your team already uses.
+
+<Steps>
+
+### Open the Integrations panel
+
+Navigate to **Settings → Integrations**. Available integrations are displayed as cards. Click any card to open its configuration drawer.
+
+### Authorize a third-party app
+
+Click **Connect** on the integration card. You are redirected to the third-party app's OAuth consent screen. Approve the requested permissions, and the integration appears as **Connected** in your Dashboard.
+
+### Configure sync options
+
+Each integration exposes its own set of sync options — for example, which resource types to sync, sync direction (read-only vs. bidirectional), and how often to poll for changes.
+
+<Note>
+Disconnecting an integration immediately stops data sync. Any data already transferred is not deleted — you must remove it manually from both platforms if needed.
+</Note>
+
+</Steps>
+
+## Environment-Specific Configuration
+
+Use separate configuration objects for your development and production environments to prevent test data from affecting live services.
+
+The recommended approach is to keep a JSON configuration file per environment and load it at application startup.
+
+**`config/development.json`**
+
+```json
+{
+  "google": {
+    "apiBaseUrl": "https://api.google.com/v1",
+    "apiKey": "${GOOGLE_API_KEY_DEV}",
+    "timeout": 10000,
+    "retries": 3,
+    "allowedOrigins": [
+      "http://localhost:3000",
+      "http://localhost:8080"
+    ],
+    "logging": {
+      "level": "debug",
+      "includeRequestBody": true
+    }
+  }
+}
+```
+
+**`config/production.json`**
+
+```json
+{
+  "google": {
+    "apiBaseUrl": "https://api.google.com/v1",
+    "apiKey": "${GOOGLE_API_KEY_PROD}",
+    "timeout": 5000,
+    "retries": 5,
+    "allowedOrigins": [
+      "https://app.yourcompany.com"
+    ],
+    "logging": {
+      "level": "error",
+      "includeRequestBody": false
+    }
+  }
+}
+```
+
+<Note>
+Never put raw API key values in your configuration files. Use placeholder strings like `${GOOGLE_API_KEY_PROD}` and substitute them from your secrets manager or CI/CD environment variables at deploy time.
+</Note>
+
+Load the correct file based on the `NODE_ENV` environment variable (or your platform's equivalent):
+
+```javascript
+import { readFileSync } from "fs";
+
+const env = process.env.NODE_ENV ?? "development";
+const config = JSON.parse(
+  readFileSync(`./config/${env}.json`, "utf8")
+);
+
+// Substitute environment variables
+const apiKey = config.google.apiKey.replace(
+  /\$\{([^}]+)\}/g,
+  (_, name) => process.env[name] ?? ""
+);
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="key" href="/guides/authentication">
+    Understand API key and OAuth 2.0 authentication in depth.
+  </Card>
+  <Card title="Webhooks" icon="webhook" href="/guides/webhooks">
+    Push configuration change events to your own endpoints in real time.
+  </Card>
+</CardGroup>

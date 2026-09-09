@@ -1,0 +1,127 @@
+---
+title: "Set Up Your Google Account for API Access"
+sidebarTitle: "Account Setup"
+description: "Configure your Google account end-to-end — create credentials, enable API access, secure your account with 2FA, and manage your team's permissions."
+---
+
+Before you can start building with Google services, you need a properly configured Google account. This guide walks you through every step — from initial account creation to locking down security and inviting your teammates — so you can build with confidence from day one.
+
+<Steps>
+
+  <Step title="Create a Google account">
+    If you already have a Google account you want to use, skip to the next step. Otherwise:
+
+    1. Go to [accounts.google.com/signup](https://accounts.google.com/signup).
+    2. Enter your first name, last name, and a username — this becomes your `@gmail.com` address.
+    3. Create a strong password and click **Next**.
+    4. Add a recovery phone number or email address and complete the verification step.
+    5. Review Google's Terms of Service and Privacy Policy, then click **I agree**.
+
+    <Note>
+      For business and team use, consider signing up for [Google Workspace](https://workspace.google.com) instead. Workspace accounts come with centralized admin controls, custom domains, and enhanced security policies that are essential for production environments.
+    </Note>
+  </Step>
+
+  <Step title="Enable API access in account settings">
+    API access is managed through the Google API Console. Follow these steps to enable it for your account:
+
+    1. Sign in at [console.developers.google.com](https://console.developers.google.com).
+    2. Click **Select a project** in the top navigation bar, then choose **New Project**.
+    3. Give your project a descriptive name (for example, `my-app-production`) and click **Create**.
+    4. With your project selected, navigate to **APIs & Services → Library**.
+    5. Search for the specific Google APIs your application needs (for example, *Google Drive API* or *Google Maps API*) and click **Enable** on each one.
+
+    <Note>
+      You must enable each API individually for your project. Enabling an API on one project does not enable it on others. Keep production and development projects separate to avoid accidental quota or billing impacts.
+    </Note>
+  </Step>
+
+  <Step title="Generate and manage API keys">
+    API keys authenticate your application's requests to Google services. Here is how to generate and manage them:
+
+    **Generate a new API key**
+
+    1. In the API Console, go to **APIs & Services → Credentials**.
+    2. Click **+ Create Credentials** and select **API key**.
+    3. Your new key appears in a modal — copy it immediately and store it in a secure location such as a password manager or secrets vault.
+
+    **Restrict your API key (strongly recommended)**
+
+    After generating a key, click **Edit API key** to apply restrictions:
+
+    - **Application restrictions** — limit usage to specific IP addresses, referrer URLs, or mobile apps.
+    - **API restrictions** — restrict the key so it can only call the APIs your project actually uses.
+
+    **Find your existing keys**
+
+    All keys for a project are listed on the **APIs & Services → Credentials** page under the *API Keys* section. Each row shows the key name, creation date, and any restrictions applied.
+
+    <Warning>
+      Rotate your API keys immediately if you suspect they have been exposed. In the Credentials page, click the key name, then click **Regenerate key**. Update all environments with the new key before deleting the old one to avoid downtime.
+    </Warning>
+
+    <Warning>
+      Never embed API keys directly in your source code or check them into version control. Use environment variables (for example, `GOOGLE_API_KEY`) or a dedicated secrets manager such as Google Secret Manager, HashiCorp Vault, or AWS Secrets Manager.
+    </Warning>
+  </Step>
+
+  <Step title="Set up two-factor authentication (2FA)">
+    Two-factor authentication adds a critical second layer of security to your Google account. Enabling it prevents unauthorized access even if your password is compromised.
+
+    1. Go to [myaccount.google.com/security](https://myaccount.google.com/security).
+    2. Under the *How you sign in to Google* section, click **2-Step Verification**.
+    3. Click **Get started** and follow the on-screen prompts.
+    4. Choose your preferred second factor:
+       - **Google Authenticator** or another TOTP app (most secure and recommended)
+       - **SMS text message** (convenient but less secure)
+       - **Hardware security key** (strongest option for high-risk accounts)
+    5. Complete the verification flow and click **Turn on**.
+
+    <Note>
+      For Google Workspace administrators, you can enforce 2FA across your entire organization. Go to the **Admin Console → Security → Authentication → 2-Step Verification** and set the enforcement policy for all users or specific organizational units.
+    </Note>
+  </Step>
+
+  <Step title="Manage team members and permissions">
+    When working in a team, use Google Workspace or Google Cloud IAM to control who has access to what — without sharing credentials.
+
+    **Google Cloud IAM (for API and cloud resource access)**
+
+    1. Open the [Google Cloud Console](https://console.cloud.google.com) and select your project.
+    2. Navigate to **IAM & Admin → IAM**.
+    3. Click **+ Grant Access**.
+    4. Enter a team member's Google account email address.
+    5. Assign one or more **roles** to define their permission level:
+
+    | Role | Access level |
+    |---|---|
+    | **Viewer** | Read-only access to project resources |
+    | **Editor** | Can modify resources but cannot manage IAM |
+    | **Owner** | Full control including IAM and billing |
+    | **Custom role** | Tailored set of individual permissions |
+
+    6. Click **Save**. The team member can now access the project with the permissions defined by their role.
+
+    <Note>
+      Follow the **principle of least privilege** — grant each team member only the permissions they need to do their job. Review and audit IAM policies regularly, especially when team members change roles or leave the organization.
+    </Note>
+
+    **Revoking access**
+
+    To remove a team member's access, return to **IAM & Admin → IAM**, locate the member's row, click the pencil icon, and remove their roles. Click **Save** to apply the change immediately.
+  </Step>
+
+</Steps>
+
+## You are ready to build
+
+With your account created, APIs enabled, keys secured, 2FA active, and your team configured, your Google environment is ready for development. Continue with these resources:
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="quickstart">
+    Make your first API call in under five minutes.
+  </Card>
+  <Card title="API Overview" icon="book-open" href="api/overview">
+    Explore the full reference for every available endpoint.
+  </Card>
+</CardGroup>

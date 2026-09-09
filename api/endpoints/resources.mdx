@@ -1,0 +1,289 @@
+---
+title: "Resources API Endpoints Reference Guide"
+sidebarTitle: "Resources"
+description: "Create and manage resources in your Google workspace — list, retrieve, update, and delete resources via the Resources REST API."
+---
+
+The Resources API gives you full control over the assets stored in your Google workspace. Resources represent any named object — documents, datasets, configurations, or custom types — that your team creates and shares. Use these endpoints to integrate resource management directly into your own tooling.
+
+## GET /resources
+
+Retrieve a paginated list of all resources in your workspace. Filter by `type` to narrow results to a specific category of resource.
+
+<ParamField query="limit" type="integer" default={20}>
+  Maximum number of resources to return per page. Accepted range: 1–100.
+</ParamField>
+
+<ParamField query="cursor" type="string">
+  Opaque pagination cursor from the previous response. Pass this value to retrieve the next page of results.
+</ParamField>
+
+<ParamField query="type" type="string">
+  Filter results to resources of a specific type, such as `document`, `dataset`, or `config`.
+</ParamField>
+
+**Response fields**
+
+<ResponseField name="data" type="array">
+  An array of resource objects matching the query.
+
+  <Expandable title="Resource object">
+    <ResponseField name="id" type="string">Unique identifier for the resource.</ResponseField>
+    <ResponseField name="name" type="string">Display name of the resource.</ResponseField>
+    <ResponseField name="type" type="string">Category or kind of resource.</ResponseField>
+    <ResponseField name="description" type="string">Human-readable description of the resource.</ResponseField>
+    <ResponseField name="metadata" type="object">Arbitrary key-value pairs attached to the resource.</ResponseField>
+    <ResponseField name="owner_id" type="string">User ID of the resource owner.</ResponseField>
+    <ResponseField name="created_at" type="string">ISO 8601 timestamp of when the resource was created.</ResponseField>
+    <ResponseField name="updated_at" type="string">ISO 8601 timestamp of the most recent update.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="next_cursor" type="string">
+  Pagination cursor to use in your next request. `null` when you have reached the last page.
+</ResponseField>
+
+<ResponseField name="total" type="integer">
+  Total count of resources matching the query, across all pages.
+</ResponseField>
+
+```bash
+curl -X GET "https://api.google.com/v1/resources?limit=20&type=document" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+```json
+{
+  "data": [
+    {
+      "id": "res_01hy3m4n5p",
+      "name": "Q1 Financial Report",
+      "type": "document",
+      "description": "Quarterly financial summary for Q1 2025.",
+      "metadata": {
+        "department": "finance",
+        "quarter": "Q1-2025"
+      },
+      "owner_id": "usr_01hx9k2p3q",
+      "created_at": "2025-01-05T10:00:00Z",
+      "updated_at": "2025-01-20T15:30:00Z"
+    },
+    {
+      "id": "res_01hy3m4n6q",
+      "name": "Marketing Assets",
+      "type": "document",
+      "description": "Brand guidelines and marketing collateral.",
+      "metadata": {
+        "department": "marketing",
+        "version": "3.1"
+      },
+      "owner_id": "usr_01hx9k2p4r",
+      "created_at": "2025-02-10T08:15:00Z",
+      "updated_at": "2025-02-28T11:00:00Z"
+    }
+  ],
+  "next_cursor": "eyJpZCI6InJlc18wMWh5M200bjZxIn0",
+  "total": 134
+}
+```
+
+---
+
+## GET /resources/\{id\}
+
+Fetch the full details of a single resource by its unique ID.
+
+<ParamField path="id" type="string" required>
+  The unique identifier of the resource to retrieve.
+</ParamField>
+
+**Response fields**
+
+<ResponseField name="id" type="string">Unique identifier for the resource.</ResponseField>
+<ResponseField name="name" type="string">Display name of the resource.</ResponseField>
+<ResponseField name="type" type="string">Category or kind of resource.</ResponseField>
+<ResponseField name="description" type="string">Human-readable description of the resource.</ResponseField>
+<ResponseField name="metadata" type="object">Arbitrary key-value pairs attached to the resource.</ResponseField>
+<ResponseField name="owner_id" type="string">User ID of the resource owner.</ResponseField>
+<ResponseField name="created_at" type="string">ISO 8601 timestamp of when the resource was created.</ResponseField>
+<ResponseField name="updated_at" type="string">ISO 8601 timestamp of the most recent update.</ResponseField>
+
+```bash
+curl -X GET "https://api.google.com/v1/resources/res_01hy3m4n5p" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+```json
+{
+  "id": "res_01hy3m4n5p",
+  "name": "Q1 Financial Report",
+  "type": "document",
+  "description": "Quarterly financial summary for Q1 2025.",
+  "metadata": {
+    "department": "finance",
+    "quarter": "Q1-2025"
+  },
+  "owner_id": "usr_01hx9k2p3q",
+  "created_at": "2025-01-05T10:00:00Z",
+  "updated_at": "2025-01-20T15:30:00Z"
+}
+```
+
+---
+
+## POST /resources
+
+Create a new resource in your workspace. The authenticated user becomes the resource owner.
+
+<ParamField body="name" type="string" required>
+  Display name for the new resource. Must be unique within a given `type`.
+</ParamField>
+
+<ParamField body="type" type="string" required>
+  Category or kind of resource (e.g., `document`, `dataset`, `config`). You may use any string value that suits your application.
+</ParamField>
+
+<ParamField body="description" type="string">
+  A human-readable explanation of the resource's purpose.
+</ParamField>
+
+<ParamField body="metadata" type="object">
+  Arbitrary key-value pairs you want to attach to the resource for filtering or display purposes.
+</ParamField>
+
+**Response fields**
+
+<ResponseField name="id" type="string">Unique identifier assigned to the newly created resource.</ResponseField>
+<ResponseField name="name" type="string">Display name of the resource.</ResponseField>
+<ResponseField name="type" type="string">Category or kind of resource.</ResponseField>
+<ResponseField name="description" type="string">Description of the resource.</ResponseField>
+<ResponseField name="metadata" type="object">Metadata key-value pairs attached to the resource.</ResponseField>
+<ResponseField name="owner_id" type="string">User ID of the creator, set automatically from the API key.</ResponseField>
+<ResponseField name="created_at" type="string">ISO 8601 timestamp of creation.</ResponseField>
+<ResponseField name="updated_at" type="string">ISO 8601 timestamp of the most recent update.</ResponseField>
+
+<Tip>
+  Use the `metadata` field to embed searchable attributes — like `department`, `region`, or `version` — without modifying your schema.
+</Tip>
+
+```bash
+curl -X POST "https://api.google.com/v1/resources" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Customer Segmentation Model",
+    "type": "dataset",
+    "description": "ML training dataset for customer segmentation.",
+    "metadata": {
+      "department": "data-science",
+      "version": "1.0"
+    }
+  }'
+```
+
+```json
+{
+  "id": "res_01hy3m4n7r",
+  "name": "Customer Segmentation Model",
+  "type": "dataset",
+  "description": "ML training dataset for customer segmentation.",
+  "metadata": {
+    "department": "data-science",
+    "version": "1.0"
+  },
+  "owner_id": "usr_01hx9k2p3q",
+  "created_at": "2025-03-01T12:00:00Z",
+  "updated_at": "2025-03-01T12:00:00Z"
+}
+```
+
+---
+
+## PATCH /resources/\{id\}
+
+Update one or more fields on an existing resource. Only include the fields you want to change — all other fields remain as they are.
+
+<ParamField path="id" type="string" required>
+  The unique identifier of the resource to update.
+</ParamField>
+
+<ParamField body="name" type="string">
+  New display name for the resource.
+</ParamField>
+
+<ParamField body="type" type="string">
+  New type classification for the resource.
+</ParamField>
+
+<ParamField body="description" type="string">
+  Updated description of the resource.
+</ParamField>
+
+<ParamField body="metadata" type="object">
+  Updated metadata object. This **replaces** the existing metadata entirely — merge client-side before sending if you want to preserve existing keys.
+</ParamField>
+
+**Response fields**
+
+<ResponseField name="id" type="string">Unique identifier of the updated resource.</ResponseField>
+<ResponseField name="name" type="string">Current display name of the resource.</ResponseField>
+<ResponseField name="type" type="string">Current type of the resource.</ResponseField>
+<ResponseField name="description" type="string">Current description of the resource.</ResponseField>
+<ResponseField name="metadata" type="object">Current metadata attached to the resource.</ResponseField>
+<ResponseField name="owner_id" type="string">User ID of the resource owner.</ResponseField>
+<ResponseField name="created_at" type="string">ISO 8601 timestamp of when the resource was created.</ResponseField>
+<ResponseField name="updated_at" type="string">ISO 8601 timestamp reflecting this update.</ResponseField>
+
+```bash
+curl -X PATCH "https://api.google.com/v1/resources/res_01hy3m4n7r" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "description": "Updated ML training dataset — includes 2025 cohort data.",
+    "metadata": {
+      "department": "data-science",
+      "version": "2.0"
+    }
+  }'
+```
+
+```json
+{
+  "id": "res_01hy3m4n7r",
+  "name": "Customer Segmentation Model",
+  "type": "dataset",
+  "description": "Updated ML training dataset — includes 2025 cohort data.",
+  "metadata": {
+    "department": "data-science",
+    "version": "2.0"
+  },
+  "owner_id": "usr_01hx9k2p3q",
+  "created_at": "2025-03-01T12:00:00Z",
+  "updated_at": "2025-03-15T09:45:00Z"
+}
+```
+
+---
+
+## DELETE /resources/\{id\}
+
+Permanently delete a resource from your workspace. This action cannot be undone and immediately removes the resource for all users.
+
+<ParamField path="id" type="string" required>
+  The unique identifier of the resource to delete.
+</ParamField>
+
+A successful deletion returns `204 No Content` with an empty response body.
+
+<Warning>
+  Deleting a resource is permanent. Associated events referencing this resource in the audit log are preserved, but the resource itself cannot be restored. Archive the resource's data before deletion if you need to retain it.
+</Warning>
+
+```bash
+curl -X DELETE "https://api.google.com/v1/resources/res_01hy3m4n7r" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+```
+HTTP/1.1 204 No Content
+```

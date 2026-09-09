@@ -1,0 +1,225 @@
+---
+title: "Build Your First Integration with Google's API"
+sidebarTitle: "First Integration"
+description: "Follow this step-by-step guide to make your first authenticated API call, fetch resources, and create new ones using Google's API."
+---
+
+Building your first integration with Google's API takes just a few minutes. This guide walks you through every step — from setting up your credentials to creating your first resource — so you have a solid foundation to build on.
+
+## Prerequisites
+
+Before you begin, make sure you have the following ready:
+
+- A Google account with API access enabled
+- Your API key (find it in the [Google Dashboard](https://dashboard.google.com) under **Settings → API Keys**)
+- `curl` installed, or a JavaScript environment (Node.js 18+ or a modern browser)
+
+<Tip>
+Keep your API key in an environment variable like `GOOGLE_API_KEY` rather than hardcoding it in your source files. This prevents accidental exposure in version control.
+</Tip>
+
+## Set Up Your Environment
+
+<Steps>
+
+### Store your API key
+
+Save your API key as an environment variable so every example in this guide works out of the box.
+
+```bash
+export GOOGLE_API_KEY="your_api_key_here"
+```
+
+### Choose your HTTP client
+
+You can follow along using `curl` in any terminal or the native `fetch` API in JavaScript. Pick whichever fits your stack — all examples below are shown in both.
+
+### Verify connectivity
+
+Send a quick ping to confirm your credentials are working before you write any real logic.
+
+<CodeGroup>
+
+```bash curl
+curl -X GET https://api.google.com/v1/ping \
+  -H "Authorization: Bearer $GOOGLE_API_KEY"
+```
+
+```javascript JavaScript
+const response = await fetch("https://api.google.com/v1/ping", {
+  headers: {
+    Authorization: `Bearer ${process.env.GOOGLE_API_KEY}`,
+  },
+});
+
+const data = await response.json();
+console.log(data); // { "status": "ok" }
+```
+
+</CodeGroup>
+
+A successful response looks like:
+
+```json
+{
+  "status": "ok",
+  "timestamp": "2024-01-15T10:30:00Z"
+}
+```
+
+</Steps>
+
+## Authenticate Your Requests
+
+Every request to Google's API must include your API key in the `Authorization` header using the `Bearer` scheme.
+
+```
+Authorization: Bearer YOUR_API_KEY
+```
+
+<Note>
+All API requests must be made over HTTPS. Plain HTTP requests are rejected with a `403 Forbidden` response.
+</Note>
+
+## Fetch a List of Resources
+
+With authentication in place, retrieve the full list of resources in your account using `GET /resources`.
+
+<CodeGroup>
+
+```bash curl
+curl -X GET https://api.google.com/v1/resources \
+  -H "Authorization: Bearer $GOOGLE_API_KEY" \
+  -H "Content-Type: application/json"
+```
+
+```javascript JavaScript
+const response = await fetch("https://api.google.com/v1/resources", {
+  method: "GET",
+  headers: {
+    Authorization: `Bearer ${process.env.GOOGLE_API_KEY}`,
+    "Content-Type": "application/json",
+  },
+});
+
+const { resources } = await response.json();
+console.log(resources);
+```
+
+</CodeGroup>
+
+A successful `200 OK` response returns a paginated list:
+
+```json
+{
+  "resources": [
+    {
+      "id": "res_01abc123",
+      "name": "My First Resource",
+      "status": "active",
+      "created_at": "2024-01-10T08:00:00Z"
+    }
+  ],
+  "meta": {
+    "total": 1,
+    "page": 1,
+    "per_page": 20
+  }
+}
+```
+
+<Tip>
+Use the `page` and `per_page` query parameters to paginate through large result sets — for example, `GET /resources?page=2&per_page=50`.
+</Tip>
+
+## Create a New Resource
+
+Send a `POST /resources` request with a JSON body to create your first resource.
+
+<CodeGroup>
+
+```bash curl
+curl -X POST https://api.google.com/v1/resources \
+  -H "Authorization: Bearer $GOOGLE_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "My New Resource",
+    "type": "standard",
+    "metadata": {
+      "environment": "production",
+      "owner": "alice@example.com"
+    }
+  }'
+```
+
+```javascript JavaScript
+const response = await fetch("https://api.google.com/v1/resources", {
+  method: "POST",
+  headers: {
+    Authorization: `Bearer ${process.env.GOOGLE_API_KEY}`,
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    name: "My New Resource",
+    type: "standard",
+    metadata: {
+      environment: "production",
+      owner: "alice@example.com",
+    },
+  }),
+});
+
+if (!response.ok) {
+  const error = await response.json();
+  throw new Error(`API error: ${error.message}`);
+}
+
+const resource = await response.json();
+console.log("Created resource:", resource.id);
+```
+
+</CodeGroup>
+
+## Handle the Response
+
+A successful creation returns `201 Created` with the full resource object:
+
+```json
+{
+  "id": "res_02xyz789",
+  "name": "My New Resource",
+  "type": "standard",
+  "status": "active",
+  "metadata": {
+    "environment": "production",
+    "owner": "alice@example.com"
+  },
+  "created_at": "2024-01-15T10:35:00Z",
+  "updated_at": "2024-01-15T10:35:00Z"
+}
+```
+
+Store the returned `id` — you'll use it to read, update, or delete this resource in future requests.
+
+<Tip>
+Always check the HTTP status code before parsing the response body. Codes in the `4xx` range indicate a problem with your request (invalid parameters, missing auth), while `5xx` codes signal a temporary issue on Google's side — implement exponential backoff and retry logic for those.
+</Tip>
+
+## Next Steps
+
+Now that your first integration is working, explore these areas to go deeper:
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="key" href="/guides/authentication">
+    Learn about OAuth 2.0 flows and token management for user-delegated access.
+  </Card>
+  <Card title="Configuration" icon="gear" href="/guides/configuration">
+    Customize API settings, rate limits, and environment-specific options.
+  </Card>
+  <Card title="Webhooks" icon="webhook" href="/guides/webhooks">
+    React to events in real time by registering webhook endpoints.
+  </Card>
+  <Card title="API Reference" icon="book" href="/api/overview">
+    Browse the full list of endpoints, parameters, and response schemas.
+  </Card>
+</CardGroup>

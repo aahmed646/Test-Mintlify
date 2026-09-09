@@ -1,0 +1,236 @@
+---
+title: "Authenticate Your Requests with Google's API"
+sidebarTitle: "Authentication"
+description: "Learn how to use API keys and OAuth 2.0 to authenticate with Google's API, manage tokens, and keep your credentials secure."
+---
+
+Securing your integration starts with proper authentication. Google's API supports two authentication methods: **API key** authentication for server-to-server calls and **OAuth 2.0** for accessing resources on behalf of a user. Choose the method that fits your use case — or use both in the same application.
+
+<Tabs>
+
+<Tab title="API Key">
+
+## Get Your API Key
+
+You generate API keys from the Google Dashboard. Each key is scoped to your account and carries your full permissions, so treat it like a password.
+
+1. Sign in to the [Google Dashboard](https://dashboard.google.com).
+2. Navigate to **Settings → API Keys**.
+3. Click **Create New Key**, give it a descriptive name, and copy the value immediately — it is only shown once.
+
+<Warning>
+Store your API key in a secrets manager or environment variable. **Never** commit it to source control or embed it in client-side JavaScript — anyone who finds it can make requests on your behalf.
+</Warning>
+
+## Include the Key in Requests
+
+Pass your API key in the `Authorization` header using the `Bearer` scheme on every request.
+
+<CodeGroup>
+
+```bash curl
+curl -X GET https://api.google.com/v1/resources \
+  -H "Authorization: Bearer $GOOGLE_API_KEY"
+```
+
+```javascript JavaScript
+const response = await fetch("https://api.google.com/v1/resources", {
+  headers: {
+    Authorization: `Bearer ${process.env.GOOGLE_API_KEY}`,
+  },
+});
+
+const data = await response.json();
+```
+
+</CodeGroup>
+
+<Note>
+Do not pass your API key as a query parameter (e.g., `?api_key=...`). Query parameters can appear in server logs and browser history. The `Authorization` header is the only supported and secure transport.
+</Note>
+
+## Rotate Your Keys Regularly
+
+Rotating keys limits the blast radius if one is ever compromised.
+
+1. In the Dashboard, create a new key under **Settings → API Keys**.
+2. Update every service or environment variable that uses the old key.
+3. Verify all services are using the new key.
+4. Delete the old key from the Dashboard.
+
+<Tip>
+Set a calendar reminder to rotate your API keys every 90 days. For high-security environments, consider rotating monthly.
+</Tip>
+
+</Tab>
+
+<Tab title="OAuth 2.0">
+
+## When to Use OAuth 2.0
+
+Use OAuth 2.0 when your application needs to act on behalf of a user — for example, reading their files, sending emails, or accessing personal settings. The user grants explicit consent, and your app receives a scoped access token.
+
+## Step 1 — Redirect the User to the Authorization URL
+
+Construct the authorization URL and redirect the user's browser to it.
+
+```
+https://accounts.google.com/o/oauth2/v2/auth
+  ?client_id=YOUR_CLIENT_ID
+  &redirect_uri=https://yourapp.com/oauth/callback
+  &response_type=code
+  &scope=profile email
+  &state=RANDOM_CSRF_TOKEN
+```
+
+| Parameter | Description |
+|---|---|
+| `client_id` | Your app's client ID from the Dashboard |
+| `redirect_uri` | The callback URL registered for your app |
+| `scope` | Space-separated list of permissions you need |
+| `state` | A random value you generate to prevent CSRF attacks |
+
+<Warning>
+Always validate the `state` parameter when the user returns to your callback URL. If the value does not match what you sent, abort the flow — the request may have been tampered with.
+</Warning>
+
+## Step 2 — Exchange the Code for a Token
+
+After the user approves, Google redirects them to your `redirect_uri` with an authorization `code` query parameter. Exchange that code for an access token and a refresh token.
+
+<CodeGroup>
+
+```bash curl
+curl -X POST https://oauth2.googleapis.com/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "code=AUTHORIZATION_CODE" \
+  -d "client_id=YOUR_CLIENT_ID" \
+  -d "client_secret=YOUR_CLIENT_SECRET" \
+  -d "redirect_uri=https://yourapp.com/oauth/callback" \
+  -d "grant_type=authorization_code"
+```
+
+```javascript JavaScript
+const params = new URLSearchParams({
+  code: authorizationCode,
+  client_id: process.env.GOOGLE_CLIENT_ID,
+  client_secret: process.env.GOOGLE_CLIENT_SECRET,
+  redirect_uri: "https://yourapp.com/oauth/callback",
+  grant_type: "authorization_code",
+});
+
+const response = await fetch("https://oauth2.googleapis.com/token", {
+  method: "POST",
+  headers: { "Content-Type": "application/x-www-form-urlencoded" },
+  body: params.toString(),
+});
+
+const { access_token, refresh_token, expires_in } = await response.json();
+// Persist both tokens securely (e.g., encrypted database)
+```
+
+</CodeGroup>
+
+A successful response returns:
+
+```json
+{
+  "access_token": "ya29.a0AfH6SM...",
+  "refresh_token": "1//0eXyZ...",
+  "expires_in": 3600,
+  "token_type": "Bearer",
+  "scope": "profile email"
+}
+```
+
+## Step 3 — Use the Access Token
+
+Include the access token in the `Authorization` header, exactly like an API key.
+
+<CodeGroup>
+
+```bash curl
+curl -X GET https://api.google.com/v1/me \
+  -H "Authorization: Bearer ya29.a0AfH6SM..."
+```
+
+```javascript JavaScript
+const response = await fetch("https://api.google.com/v1/me", {
+  headers: {
+    Authorization: `Bearer ${accessToken}`,
+  },
+});
+
+const profile = await response.json();
+```
+
+</CodeGroup>
+
+## Refresh an Expired Token
+
+Access tokens expire after the number of seconds indicated by `expires_in` (typically 3600 seconds / 1 hour). Use your refresh token to get a new access token without requiring the user to log in again.
+
+<CodeGroup>
+
+```bash curl
+curl -X POST https://oauth2.googleapis.com/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "refresh_token=YOUR_REFRESH_TOKEN" \
+  -d "client_id=YOUR_CLIENT_ID" \
+  -d "client_secret=YOUR_CLIENT_SECRET" \
+  -d "grant_type=refresh_token"
+```
+
+```javascript JavaScript
+async function refreshAccessToken(refreshToken) {
+  const params = new URLSearchParams({
+    refresh_token: refreshToken,
+    client_id: process.env.GOOGLE_CLIENT_ID,
+    client_secret: process.env.GOOGLE_CLIENT_SECRET,
+    grant_type: "refresh_token",
+  });
+
+  const response = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: params.toString(),
+  });
+
+  const { access_token, expires_in } = await response.json();
+  return { access_token, expires_in };
+}
+```
+
+</CodeGroup>
+
+<Note>
+Refresh tokens do not expire by default, but they are invalidated if the user revokes your app's access or if your client secret is rotated. Always handle a `401 Unauthorized` response from the token endpoint gracefully by prompting the user to re-authorize.
+</Note>
+
+</Tab>
+
+</Tabs>
+
+## Security Best Practices
+
+Follow these guidelines to keep your credentials and your users' data safe:
+
+<AccordionGroup>
+
+<Accordion title="Never expose credentials in client-side code">
+API keys and OAuth client secrets must only live in server-side code or environment variables. If you build a single-page app or mobile app, use a backend proxy that adds the `Authorization` header on the server before forwarding requests.
+</Accordion>
+
+<Accordion title="Use the minimum required scopes">
+Request only the OAuth scopes your app genuinely needs. Requesting broad permissions increases the impact of a compromised token and may reduce user trust during the consent screen.
+</Accordion>
+
+<Accordion title="Store tokens securely">
+Persist refresh tokens in an encrypted datastore — not in `localStorage`, cookies without the `HttpOnly` flag, or plaintext files. Treat them with the same care you give passwords.
+</Accordion>
+
+<Accordion title="Rotate API keys regularly">
+Create a key rotation schedule (every 90 days is a reasonable default) and automate the process where possible. Immediately revoke any key you suspect has been compromised.
+</Accordion>
+
+</AccordionGroup>

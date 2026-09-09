@@ -1,0 +1,209 @@
+---
+title: "Events API Endpoints & Audit Log Reference"
+sidebarTitle: "Events"
+description: "Query the Google activity log with the Events API — filter by type, resource, user, or time range to power audit logging and compliance workflows."
+---
+
+The Events API provides read-only access to your workspace activity log. Every time a user or the system acts on a resource or account — creating, updating, or deleting it — Google automatically records an event. Use these endpoints to build audit dashboards, trigger compliance workflows, or investigate incidents.
+
+<Info>
+  Events are system-generated and immutable. You cannot create, update, or delete events through the API.
+</Info>
+
+## GET /events
+
+Retrieve a paginated, time-ordered list of events from your workspace activity log. Combine filters to narrow results to exactly the activity you care about.
+
+<ParamField query="limit" type="integer" default={20}>
+  Maximum number of events to return per page. Accepted range: 1–100.
+</ParamField>
+
+<ParamField query="cursor" type="string">
+  Opaque pagination cursor returned by the previous response. Pass this to retrieve the next page of results.
+</ParamField>
+
+<ParamField query="type" type="string">
+  Filter to events of a specific type, such as `resource.created` or `user.updated`. See the [event types reference](#event-types-reference) below for all accepted values.
+</ParamField>
+
+<ParamField query="resource_id" type="string">
+  Filter to events associated with a specific resource ID.
+</ParamField>
+
+<ParamField query="user_id" type="string">
+  Filter to events performed by a specific user (matched against `actor_id`).
+</ParamField>
+
+<ParamField query="start_time" type="string">
+  Return only events at or after this ISO 8601 timestamp (e.g., `2025-01-01T00:00:00Z`).
+</ParamField>
+
+<ParamField query="end_time" type="string">
+  Return only events at or before this ISO 8601 timestamp (e.g., `2025-01-31T23:59:59Z`).
+</ParamField>
+
+**Response fields**
+
+<ResponseField name="data" type="array">
+  An array of event objects matching the query, ordered by `timestamp` descending.
+
+  <Expandable title="Event object">
+    <ResponseField name="id" type="string">Unique identifier for the event.</ResponseField>
+    <ResponseField name="type" type="string">Event type string (e.g., `resource.created`).</ResponseField>
+    <ResponseField name="actor_id" type="string">User ID of the person or service that triggered the event.</ResponseField>
+    <ResponseField name="resource_id" type="string">ID of the affected resource. `null` for user-only events.</ResponseField>
+    <ResponseField name="payload" type="object">Structured data describing the change. Shape varies by event type.</ResponseField>
+    <ResponseField name="timestamp" type="string">ISO 8601 timestamp of when the event occurred.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="next_cursor" type="string">
+  Cursor to pass in your next request. `null` when you have reached the oldest matching event.
+</ResponseField>
+
+<ResponseField name="total" type="integer">
+  Total number of events matching the query, across all pages.
+</ResponseField>
+
+```bash
+curl -X GET "https://api.google.com/v1/events?type=resource.deleted&start_time=2025-01-01T00:00:00Z&end_time=2025-01-31T23:59:59Z" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+```json
+{
+  "data": [
+    {
+      "id": "evt_01hz7p8q9r",
+      "type": "resource.deleted",
+      "actor_id": "usr_01hx9k2p3q",
+      "resource_id": "res_01hy3m4n7r",
+      "payload": {
+        "resource_name": "Customer Segmentation Model",
+        "resource_type": "dataset"
+      },
+      "timestamp": "2025-01-22T14:05:00Z"
+    },
+    {
+      "id": "evt_01hz7p8q8q",
+      "type": "resource.deleted",
+      "actor_id": "usr_01hx9k2p4r",
+      "resource_id": "res_01hy3m4n6q",
+      "payload": {
+        "resource_name": "Legacy Config v1",
+        "resource_type": "config"
+      },
+      "timestamp": "2025-01-18T09:30:00Z"
+    }
+  ],
+  "next_cursor": "eyJpZCI6ImV2dF8wMWh6N3A4cThxIn0",
+  "total": 12
+}
+```
+
+---
+
+## GET /events/\{id\}
+
+Retrieve the full details of a single event by its unique ID. Use this to inspect a specific activity record when you already have the event ID from a list response or a webhook payload.
+
+<ParamField path="id" type="string" required>
+  The unique identifier of the event to retrieve.
+</ParamField>
+
+**Response fields**
+
+<ResponseField name="id" type="string">Unique identifier for the event.</ResponseField>
+<ResponseField name="type" type="string">Event type string (e.g., `user.created`).</ResponseField>
+<ResponseField name="actor_id" type="string">User ID of the person or service that triggered the event.</ResponseField>
+<ResponseField name="resource_id" type="string">ID of the affected resource. `null` for user-only events.</ResponseField>
+<ResponseField name="payload" type="object">Structured data describing the change. Shape varies by event type.</ResponseField>
+<ResponseField name="timestamp" type="string">ISO 8601 timestamp of when the event occurred.</ResponseField>
+
+```bash
+curl -X GET "https://api.google.com/v1/events/evt_01hz7p8q9r" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+```json
+{
+  "id": "evt_01hz7p8q9r",
+  "type": "resource.deleted",
+  "actor_id": "usr_01hx9k2p3q",
+  "resource_id": "res_01hy3m4n7r",
+  "payload": {
+    "resource_name": "Customer Segmentation Model",
+    "resource_type": "dataset"
+  },
+  "timestamp": "2025-01-22T14:05:00Z"
+}
+```
+
+---
+
+## Event Types Reference
+
+Every event has a `type` field that identifies what action occurred. The table below describes each system-generated event type and when Google creates it.
+
+| Event type | Triggered when |
+|---|---|
+| `resource.created` | A new resource is successfully created via `POST /resources`. |
+| `resource.updated` | An existing resource is modified via `PATCH /resources/{id}`. |
+| `resource.deleted` | A resource is permanently removed via `DELETE /resources/{id}`. |
+| `user.created` | A new user account is created via `POST /users`. |
+| `user.updated` | An existing user's name, email, or role is changed via `PATCH /users/{id}`. |
+
+<Note>
+  Additional event types may be introduced as new Google features are released. Build your event consumers to handle unknown `type` values gracefully rather than failing hard.
+</Note>
+
+---
+
+## Using Events for Audit Logging
+
+The Events API is designed as a foundation for audit logging and compliance reporting. Below are the recommended patterns for common audit scenarios.
+
+<Accordion title="Export a full audit log for a date range">
+  Page through all events in a given window by combining `start_time`, `end_time`, and the `cursor` parameter. Repeat the request with the returned `next_cursor` until `next_cursor` is `null`.
+
+  ```bash
+  # Page 1
+  curl -X GET "https://api.google.com/v1/events?start_time=2025-01-01T00:00:00Z&end_time=2025-01-31T23:59:59Z&limit=100" \
+    -H "Authorization: Bearer YOUR_API_KEY"
+
+  # Subsequent pages — replace CURSOR with the next_cursor value from the previous response
+  curl -X GET "https://api.google.com/v1/events?start_time=2025-01-01T00:00:00Z&end_time=2025-01-31T23:59:59Z&limit=100&cursor=CURSOR" \
+    -H "Authorization: Bearer YOUR_API_KEY"
+  ```
+</Accordion>
+
+<Accordion title="Trace all actions by a specific user">
+  Pass the user's ID in the `user_id` query parameter to retrieve every event that user triggered. Combine with `start_time` and `end_time` to scope the results to an investigation window.
+
+  ```bash
+  curl -X GET "https://api.google.com/v1/events?user_id=usr_01hx9k2p3q&limit=50" \
+    -H "Authorization: Bearer YOUR_API_KEY"
+  ```
+</Accordion>
+
+<Accordion title="View all activity on a specific resource">
+  Pass the resource's ID in the `resource_id` parameter to see its full lifecycle — creation, every update, and deletion if applicable.
+
+  ```bash
+  curl -X GET "https://api.google.com/v1/events?resource_id=res_01hy3m4n5p" \
+    -H "Authorization: Bearer YOUR_API_KEY"
+  ```
+</Accordion>
+
+<Accordion title="Monitor for deletion events in real time">
+  Filter to `resource.deleted` or `user.updated` events and poll at a regular interval using `start_time` set to your last poll timestamp. Store the timestamp of the most recent event after each poll to use as your next `start_time`.
+
+  ```bash
+  curl -X GET "https://api.google.com/v1/events?type=resource.deleted&start_time=2025-03-01T00:00:00Z" \
+    -H "Authorization: Bearer YOUR_API_KEY"
+  ```
+</Accordion>
+
+<Tip>
+  For high-volume workspaces, store exported events in your own data warehouse or SIEM. The Events API retains activity for 90 days — export regularly to avoid gaps in your long-term audit trail.
+</Tip>

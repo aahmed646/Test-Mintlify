@@ -1,0 +1,268 @@
+---
+title: "Receive Real-Time Events with Google Webhooks"
+sidebarTitle: "Webhooks"
+description: "Set up webhook endpoints, register them with Google's API, verify signatures, and handle retries to react to events in real time."
+---
+
+Webhooks let Google push event notifications directly to your server the moment something happens — no polling required. Instead of repeatedly asking "did anything change?", you register an endpoint and Google calls it automatically whenever a subscribed event fires. This guide shows you how to build, register, and secure a production-ready webhook integration.
+
+## What Are Webhooks and When Should You Use Them?
+
+A webhook is an HTTPS endpoint on your server that Google calls with a `POST` request whenever a subscribed event occurs. Use webhooks when you need to:
+
+- Trigger downstream workflows immediately after a resource is created or updated
+- Sync data to an external database without a polling loop
+- Send notifications to users in real time (for example, via email or Slack)
+- Audit changes to resources as they happen
+
+<Note>
+Webhooks require a publicly reachable HTTPS URL. During local development, use a tunneling tool like [ngrok](https://ngrok.com) or [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-apps) to expose your local server.
+</Note>
+
+## Available Event Types
+
+Subscribe to one or more of the following events when you register a webhook:
+
+| Event type | Triggered when |
+|---|---|
+| `user.created` | A new user account is created in your organization |
+| `resource.created` | A new resource is created |
+| `resource.updated` | An existing resource's properties are changed |
+| `resource.deleted` | A resource is permanently deleted |
+| `event.fired` | A custom event is emitted by an integration |
+
+## Set Up Your Webhook Endpoint
+
+<Steps>
+
+### Create a route in your application
+
+Add an HTTP `POST` route to your server that accepts incoming webhook payloads. The endpoint must respond with a `2xx` status code within **5 seconds** to acknowledge receipt.
+
+```javascript Node.js (Express)
+import express from "express";
+import crypto from "crypto";
+
+const app = express();
+
+// Parse the raw body for signature verification (do not use express.json() here)
+app.post(
+  "/webhooks/google",
+  express.raw({ type: "application/json" }),
+  (req, res) => {
+    // 1. Verify the signature (see the Verify Signatures section below)
+    const isValid = verifySignature(req);
+    if (!isValid) {
+      return res.status(401).json({ error: "Invalid signature" });
+    }
+
+    // 2. Parse and handle the event
+    const event = JSON.parse(req.body.toString());
+    handleEvent(event);
+
+    // 3. Acknowledge receipt immediately
+    res.status(200).json({ received: true });
+  }
+);
+
+function handleEvent(event) {
+  switch (event.type) {
+    case "resource.created":
+      console.log("New resource:", event.data.id);
+      break;
+    case "resource.updated":
+      console.log("Updated resource:", event.data.id);
+      break;
+    case "resource.deleted":
+      console.log("Deleted resource:", event.data.id);
+      break;
+    default:
+      console.log("Unhandled event type:", event.type);
+  }
+}
+
+app.listen(3000, () => console.log("Listening on port 3000"));
+```
+
+<Tip>
+Process the event asynchronously — acknowledge the webhook immediately with `200 OK`, then hand off the payload to a queue or background worker. Long-running handlers risk timing out and causing Google to retry the delivery.
+</Tip>
+
+### Expose your local server for testing
+
+If you are developing locally, start a tunnel to make your server reachable:
+
+```bash
+# Using ngrok
+ngrok http 3000
+
+# Your public URL will look like:
+# https://a1b2-203-0-113-42.ngrok-free.app
+```
+
+Copy the generated HTTPS URL — you will use it when registering the webhook in the next step.
+
+### Register your webhook via the API
+
+Call `POST /webhooks` with your endpoint URL and the event types you want to subscribe to.
+
+```bash curl
+curl -X POST https://api.google.com/v1/webhooks \
+  -H "Authorization: Bearer $GOOGLE_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://a1b2-203-0-113-42.ngrok-free.app/webhooks/google",
+    "events": [
+      "resource.created",
+      "resource.updated",
+      "resource.deleted"
+    ],
+    "description": "My development webhook"
+  }'
+```
+
+A successful `201 Created` response includes a `secret` you will use to verify signatures:
+
+```json
+{
+  "id": "wh_01abc123",
+  "url": "https://a1b2-203-0-113-42.ngrok-free.app/webhooks/google",
+  "events": ["resource.created", "resource.updated", "resource.deleted"],
+  "secret": "whsec_8f3k2mN...",
+  "status": "active",
+  "created_at": "2024-01-15T10:00:00Z"
+}
+```
+
+<Warning>
+Save the `secret` value immediately — it is only returned once at creation time. You will need it to verify every incoming webhook payload. Store it in an environment variable such as `GOOGLE_WEBHOOK_SECRET`.
+</Warning>
+
+### Confirm delivery
+
+After registering, Google sends a test `POST` to your endpoint with an event of type `webhook.test`. Confirm your server returns `200 OK` to complete setup.
+
+</Steps>
+
+## Sample Webhook Payload
+
+Every webhook `POST` includes a JSON body with a consistent envelope:
+
+```json
+{
+  "id": "evt_01xyz789",
+  "type": "resource.created",
+  "created_at": "2024-01-15T10:35:22Z",
+  "data": {
+    "id": "res_02abc456",
+    "name": "My New Resource",
+    "type": "standard",
+    "status": "active",
+    "metadata": {
+      "environment": "production",
+      "owner": "alice@example.com"
+    },
+    "created_at": "2024-01-15T10:35:20Z",
+    "updated_at": "2024-01-15T10:35:20Z"
+  }
+}
+```
+
+| Field | Description |
+|---|---|
+| `id` | Unique event ID — use this to deduplicate retries |
+| `type` | The event type string (e.g., `resource.created`) |
+| `created_at` | ISO 8601 timestamp of when the event was generated |
+| `data` | The full object affected by the event |
+
+## Verify Webhook Signatures
+
+Google signs every webhook request with an HMAC-SHA256 signature computed from the raw request body and your webhook secret. **Always verify the signature** before processing a payload.
+
+The signature is delivered in the `X-Google-Signature` request header:
+
+```
+X-Google-Signature: sha256=3d2c1b0a...
+```
+
+```javascript Node.js
+import crypto from "crypto";
+
+function verifySignature(req) {
+  const secret = process.env.GOOGLE_WEBHOOK_SECRET;
+  const signatureHeader = req.headers["x-google-signature"] ?? "";
+  const [algorithm, receivedHmac] = signatureHeader.split("=");
+
+  if (algorithm !== "sha256" || !receivedHmac) {
+    return false;
+  }
+
+  const expectedHmac = crypto
+    .createHmac("sha256", secret)
+    .update(req.body) // req.body must be the raw Buffer
+    .digest("hex");
+
+  // Use timingSafeEqual to prevent timing attacks
+  return crypto.timingSafeEqual(
+    Buffer.from(receivedHmac, "hex"),
+    Buffer.from(expectedHmac, "hex")
+  );
+}
+```
+
+<Warning>
+You **must** use `express.raw()` (or an equivalent middleware) — not `express.json()` — to preserve the raw request body for signature verification. Parsing the body as JSON first changes the byte sequence and causes signature checks to fail.
+</Warning>
+
+## Retries and Failure Handling
+
+If your endpoint returns a non-`2xx` status code or does not respond within 5 seconds, Google retries the delivery using exponential backoff:
+
+| Attempt | Delay |
+|---|---|
+| 1st retry | 5 seconds |
+| 2nd retry | 30 seconds |
+| 3rd retry | 5 minutes |
+| 4th retry | 30 minutes |
+| 5th retry | 2 hours |
+
+After 5 failed attempts the event is marked as **undelivered** and no further retries occur.
+
+<Tip>
+Use the event `id` field to implement idempotency in your handler. If Google retries a delivery your server already processed, check whether you have already handled that ID before taking action.
+</Tip>
+
+You can inspect delivery history for any webhook from the Dashboard under **Settings → Webhooks → [your webhook] → Delivery Log**, or by calling `GET /webhooks/{id}/deliveries`.
+
+## Test Webhooks Locally
+
+Use the Dashboard's built-in **Send Test Event** button to fire a sample payload to your registered endpoint at any time:
+
+1. Open **Settings → Webhooks** in the Dashboard.
+2. Click the webhook you want to test.
+3. Select an event type from the **Send Test Event** dropdown.
+4. Click **Send** and watch your server logs for the incoming request.
+
+Alternatively, trigger a test delivery via the API:
+
+```bash curl
+curl -X POST https://api.google.com/v1/webhooks/wh_01abc123/test \
+  -H "Authorization: Bearer $GOOGLE_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "event_type": "resource.created" }'
+```
+
+<Note>
+Test events use synthetic data and are clearly marked with `"test": true` in the payload envelope. Your handler should check for this flag and skip any side effects (database writes, email sends, etc.) during testing.
+</Note>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="key" href="/guides/authentication">
+    Secure your API calls with API keys and OAuth 2.0.
+  </Card>
+  <Card title="Configuration" icon="gear" href="/guides/configuration">
+    Manage webhook secrets and notification settings from the Dashboard.
+  </Card>
+</CardGroup>

@@ -1,0 +1,81 @@
+---
+title: "Google Platform Architecture and Core Concepts"
+sidebarTitle: "Overview"
+description: "Learn how Google's cloud platform is structured, how its services connect, and the key terminology you need to build and integrate effectively."
+---
+
+Google's platform is a suite of interconnected cloud services designed to give individuals and businesses a unified, programmable foundation. Whether you're accessing features through a browser, calling the REST API, or reacting to real-time events in your own systems, every interaction follows a consistent model built around resources, users, and events.
+
+## What the Platform Consists Of
+
+Google's platform is composed of four primary layers that work together to deliver a seamless experience across every surface:
+
+<CardGroup cols={2}>
+  <Card title="Cloud Services" icon="cloud">
+    Hosted, always-on services that handle storage, compute, identity, and collaboration — accessible from any device without managing infrastructure.
+  </Card>
+  <Card title="REST API" icon="code">
+    A fully documented HTTP API that lets you create, read, update, and delete resources programmatically, with predictable endpoints and standard status codes.
+  </Card>
+  <Card title="Webhooks" icon="bolt">
+    Push-based event notifications delivered to your server the moment something changes — eliminating the need to poll for updates.
+  </Card>
+  <Card title="SDKs" icon="box">
+    Official client libraries for popular languages that wrap the REST API, handle authentication, and provide typed models so you can move faster.
+  </Card>
+</CardGroup>
+
+## How Services Connect and Interact
+
+Every Google service exposes its capabilities through the same REST API layer. When your application makes a request, it authenticates using an API key, targets a specific resource endpoint, and receives a structured JSON response. Webhooks complement this pull-based flow by pushing event payloads to a URL you register, so your systems stay in sync without continuous polling.
+
+SDKs sit on top of the REST API and provide idiomatic wrappers for your language of choice. Under the hood they construct the same HTTP requests — giving you the convenience of a library while keeping the wire protocol transparent and debuggable.
+
+## The Request / Response Model
+
+All API interactions follow a standard HTTP request/response cycle:
+
+1. Your client sends an HTTPS request with an `Authorization` header containing your API key.
+2. Google's API gateway authenticates the request and routes it to the appropriate service.
+3. The service performs the operation and returns a JSON body with a `data` envelope and metadata.
+4. For mutating operations (POST, PATCH, DELETE), a corresponding event is recorded and — if you have a matching webhook — delivered to your endpoint.
+
+```http
+GET /v1/resources/res_01abc HTTP/1.1
+Host: api.google.com
+Authorization: Bearer YOUR_API_KEY
+Accept: application/json
+```
+
+```json
+{
+  "data": {
+    "id": "res_01abc",
+    "type": "document",
+    "name": "Q4 Report",
+    "created_at": "2024-03-15T09:00:00Z",
+    "updated_at": "2024-03-15T11:30:00Z"
+  },
+  "meta": {
+    "request_id": "req_xyz789"
+  }
+}
+```
+
+## Key Terminology
+
+Understanding the following terms will help you navigate the platform and its documentation.
+
+**Resources** are the primary objects managed through the API — documents, files, projects, and so on. Every resource has a unique ID, a type, and a set of fields. Resources are scoped to a user or team and are versioned so you can track changes over time.
+
+**Events** are immutable activity records created whenever a resource changes state. They form a complete audit trail and are the source data for webhook deliveries. Events include a `type` field (e.g. `resource.created`), a timestamp, and a snapshot of the affected resource.
+
+**Users** are the account holders and team members who interact with the platform. Each user has a unique identity, a set of roles, and can hold one or more API keys. Users can belong to multiple teams and inherit permissions from both their individual account and their team memberships.
+
+**API Keys** are long-lived credentials tied to a user or service account. You include an API key in every request to prove identity and authorize the operation. Keys can be scoped to specific permissions and rotated without downtime.
+
+**Webhooks** are HTTP callbacks you register to receive event notifications. When an event matching your subscription fires, Google sends a signed POST request to your endpoint with the full event payload. You verify the signature, process the payload, and return a `2xx` status to acknowledge delivery.
+
+<Note>
+  All API keys are secret — treat them like passwords. Never commit them to source control or expose them in client-side code. Use environment variables or a secrets manager to keep them safe.
+</Note>

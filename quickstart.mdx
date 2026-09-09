@@ -1,47 +1,102 @@
 ---
-title: "Quickstart"
-description: "Begin with a guide on the fastest path to a successful outcome"
+title: "Get Started with Google APIs in Minutes"
+sidebarTitle: "Quickstart"
+description: "Make your first Google API call in under five minutes — sign in, generate an API key, and start building with Google cloud services."
 ---
 
-Describe how someone begins using your product. What is the first thing they need to do? Are there any prerequisites?
-
-A quickstart should take someone from zero to using your product. They'll get a quick win and a sense of what they can accomplish.
-
-## Prerequisites
-
-Before you begin, you must have:
-
-- Requirement one (for example, Node.js 18+, a free account, an API key)
-- Requirement two (for example, a compatible device, a compatible browser, a compatible operating system)
-
-## Get started
+Google's unified API surface gives you programmatic access to the full suite of Google cloud services — from storage and compute to identity and productivity tools. This guide walks you through the fastest path to your first successful API call.
 
 <Steps>
-  <Step title="Install">
-    Describe how to install your product or sign up.
+
+  <Step title="Sign in or create a Google account">
+    Head to [accounts.google.com](https://accounts.google.com) and sign in with your existing Google account. If you don't have one yet, click **Create account** and follow the prompts to register with your email address.
+
+    <Note>
+      Use a dedicated work or project account when building production integrations. This makes it easier to manage permissions and transfer ownership later.
+    </Note>
+  </Step>
+
+  <Step title="Navigate to API settings and generate an API key">
+    Once signed in, open the [Google API Console](https://console.developers.google.com) and follow these steps:
+
+    1. Select or create a **Project** from the top navigation bar.
+    2. In the left sidebar, go to **APIs & Services → Credentials**.
+    3. Click **+ Create Credentials** and select **API key**.
+    4. Copy the generated key and store it securely — you will not be shown it again in full.
+
+    <Warning>
+      Never commit your API key to source control or expose it in client-side code. Use environment variables or a secrets manager to keep it safe.
+    </Warning>
+  </Step>
+
+  <Step title="Make a test request">
+    With your API key in hand, run the following `curl` command in your terminal. Replace `YOUR_API_KEY` with the key you generated in the previous step.
 
     ```bash
-    npm install your-package
+    curl --request GET \
+      --url https://api.google.com/v1/resources \
+      --header "Authorization: Bearer YOUR_API_KEY" \
+      --header "Accept: application/json"
     ```
-  </Step>
-  <Step title="Configure">
-    Describe any setup or configuration needed before first use.
 
-    ```bash
-    your-cli init
-    ```
+    A successful request returns an HTTP `200 OK` status alongside a JSON payload.
   </Step>
-  <Step title="Run it">
-    Show the first thing a user does to see it working.
 
-    ```bash
-    your-cli start
+  <Step title="Parse the JSON response">
+    The API responds with a structured JSON object. Here is an example response to help you understand the shape of the data:
+
+    ```json
+    {
+      "status": "ok",
+      "data": {
+        "resources": [
+          {
+            "id": "res_01HXYZ123456",
+            "name": "My First Resource",
+            "type": "storage",
+            "created_at": "2024-06-01T10:00:00Z",
+            "status": "active"
+          },
+          {
+            "id": "res_01HXYZ789012",
+            "name": "Secondary Resource",
+            "type": "compute",
+            "created_at": "2024-06-02T08:30:00Z",
+            "status": "active"
+          }
+        ],
+        "total": 2,
+        "page": 1,
+        "per_page": 20
+      }
+    }
     ```
+
+    Key fields to note:
+
+    | Field | Type | Description |
+    |---|---|---|
+    | `data.resources` | array | List of resource objects belonging to your account |
+    | `data.total` | integer | Total number of resources across all pages |
+    | `data.page` | integer | Current page number in the paginated response |
+    | `id` | string | Unique identifier for each resource — use this in subsequent API calls |
+
+    <Tip>
+      Use a tool like [jq](https://jqlang.github.io/jq/) to pretty-print and filter JSON responses directly in your terminal: `curl ... | jq '.data.resources'`
+    </Tip>
   </Step>
+
 </Steps>
 
-<Tip>
-  Give people a way to get help. This could be a link to a support page, a chat with a customer support agent, or a forum for your product.
+## Next steps
 
-  Example: Need help? Reach out to us at [support@yourcompany.com](mailto:support@yourcompany.com).
-</Tip>
+You have made your first Google API call — here is where to go from here:
+
+<CardGroup cols={2}>
+  <Card title="Build Your First Integration" icon="plug" href="guides/first-integration">
+    Follow a step-by-step guide to connecting Google services with your application.
+  </Card>
+  <Card title="Explore the API Reference" icon="book-open" href="api/overview">
+    Browse the full API reference to discover every available endpoint and parameter.
+  </Card>
+</CardGroup>
